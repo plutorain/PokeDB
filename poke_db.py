@@ -18,6 +18,9 @@ import webbrowser
 import io
 import csv
 
+#PokeCard Browser
+import Poke_Card
+
 
 try:
     from html import escape
@@ -201,6 +204,12 @@ class PokeDBWindow(QMainWindow, form_class):
         self.bttnConditionlist = []
         self.treeWidget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.treeWidget.customContextMenuRequested.connect(self.QTreeMenu)
+        
+        #PokeCard Window
+        self.CardWindow = Poke_Card.MyWindow()
+        self.CardWindow.setWindowTitle("PokeCard Viewer")
+        self.CardWindow.setWindowIcon(QIcon("Pokemon.ico"))
+        
     
     
     def initQTableAction(self):
@@ -247,7 +256,7 @@ class PokeDBWindow(QMainWindow, form_class):
         self.HideColumnAction.triggered.connect(self.QTableHideSelected)#Prevent error first disconncet
         self.ShowColumnAction.triggered.connect(self.QTableShowSelected)#Prevent error first disconncet
     
-    
+        
     def onSectionClicked(self):
         print("section clicked")
     
@@ -410,7 +419,6 @@ class PokeDBWindow(QMainWindow, form_class):
         resultList = self.DB_SendQuery("SELECT * FROM `pokecard`.`cardinfo` LIMIT 100000;")
         self.max_cnt = len(resultList)
         input_string = ""
-        self.tableWidget.setRowCount(self.max_cnt)        
         for row in range(self.max_cnt):
             for col in range(self.col_cnt):
                 input_string += resultList[row][col][1:-1] + " "
@@ -577,7 +585,12 @@ class PokeDBWindow(QMainWindow, form_class):
                 CardNum = self.tableWidget.currentItem().text()
                 if(CardNum != ""):
                     print("Find CardNum!!! : %s "%CardNum)
-                    webbrowser.get(chrome_path).open('https://pokemoncard.co.kr/cards/detail/'+CardNum)
+                    self.CardWindow.setInputText(CardNum)
+                    self.CardWindow.btn_clicked()
+                    self.CardWindow.show()
+                    self.CardWindow.activateWindow()
+                    
+                    #webbrowser.get(chrome_path).open('https://pokemoncard.co.kr/cards/detail/'+CardNum)
     
     def QTableRowOpenUrl(self):
         row=self.tableWidget.currentRow()
