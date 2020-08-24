@@ -116,6 +116,21 @@
       </property>
      </widget>
     </widget>
+    <widget class="QWidget" name="tab3">
+     <attribute name="title">
+      <string>Log</string>
+     </attribute>
+     <widget class="QTextBrowser" name="textBrowser">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>761</width>
+        <height>451</height>
+       </rect>
+      </property>
+     </widget>
+    </widget>
    </widget>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>

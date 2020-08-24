@@ -155,7 +155,24 @@ class WordCounter():
             f.write("%s\t%d\n" % (k, self.d[k]))
         f.close()
         print("finish to write file")
-    
+
+class PokeScore():
+    def __init__(self, input_string):
+        print("PokeScoreinit")
+        cards = input_string.split('\n')
+        
+        self.data = []
+        for card in cards:
+            self.data.append(card.split(','))
+        #print(self.data)
+        
+        print("Finish Get ALL DATA")
+        
+    def CalcScore(self):
+        #self.data[0][]
+        print("clacscore")
+
+        
 class PokeDBWindow(QMainWindow, form_class):
     def __init__(self):
         super().__init__()
@@ -209,6 +226,11 @@ class PokeDBWindow(QMainWindow, form_class):
         self.CardWindow = Poke_Card.MyWindow()
         self.CardWindow.setWindowTitle("PokeCard Viewer")
         self.CardWindow.setWindowIcon(QIcon("Pokemon.ico"))
+        
+        #Log Text Viewr
+        self.searchExeCnt = 0
+        self.textBrowser.setEnabled(False)
+        self.textBrowser.setReadOnly(True)
         
     
     
@@ -357,22 +379,28 @@ class PokeDBWindow(QMainWindow, form_class):
                 return False
         #Checked item is not exist 
         first_col = None
+        log = "Search Sequence"+str(self.searchExeCnt+1)+"\n"
         for num in range(self.searchCount):
             check_cnt = 0
+            log = log+self.treelist[num].text(2)+"("
             for i in range(self.col_cnt):
                 if(self.treelist[num].child(i).checkState(1) == Qt.Checked): #Check Status
                     check_cnt+=1
+                    log += str(i+1)+","
                     if(check_cnt ==1):
                         first_col = i
+            log += ") TOTAL: "
             if(check_cnt == 0):
                 self.MessageBox("Search%d Column is not Selected"%(num+1))
                 return False
+                
         #Get Operator
         operator_list = []
         for i in range(self.searchCount):
             if(i>0):
                 print("%d : %s"%(i+1, self.bttnConditionlist[i].text() ))
                 operator_list.append(self.bttnConditionlist[i].text())
+                log=log.replace("TOTAL:", self.bttnConditionlist[i].text(),1)
         
         sql = "SELECT * FROM `pokecard`.`cardinfo` WHERE "
         
@@ -386,12 +414,24 @@ class PokeDBWindow(QMainWindow, form_class):
             if(num < self.searchCount-1): #Final loop don't need Operator
                 sql += operator_list[num]
         
-        print(sql)
-        self.QTableUpdateList(self.DB_SendQuery(sql))
+        #print(sql)
+        res = self.DB_SendQuery(sql)
+        self.QTableUpdateList(res)
+        
+        log += str(len(res))+"\n"
+        log = log.replace(",)",")")
+        #print(log)
+        self.textBrowser.append(log)
+        self.searchExeCnt += 1
+        
         self.tabWidget.setCurrentIndex(1)
         
         self.tableWidget.scrollToItem(self.tableWidget.item(0, first_col) , QAbstractItemView.PositionAtCenter)
-        
+    
+
+    #def QTextBrowserAddLog(self, ResultCount):
+        #str = 
+        #self.textBrowser.append()
         
     def Connect_Clicked(self):
         #self.MessageBox("Connect_Clicked!!")
@@ -406,23 +446,30 @@ class PokeDBWindow(QMainWindow, form_class):
             self.QMenuEnableALL(self.menuTable ,True)
             self.QMenuEnableALL(self.menuSearch ,True)
             self.QMenuEnableALL(self.menuConnect ,False)
-            
+            self.textBrowser.setEnabled(True)
+            print("Connect OK")
             self.MessageBox("Connected!!!")
             
             
+            #PokeScore(self.SendALL_DB())
             
         except mysql.connector.Error as err:
             print(err)
-            
-    
-    def WordCounter():
+        
+        
+    def SendALL_DB(self):
+        print("SendALLDB")
         resultList = self.DB_SendQuery("SELECT * FROM `pokecard`.`cardinfo` LIMIT 100000;")
         self.max_cnt = len(resultList)
         input_string = ""
+        
+        #CSV OUT
         for row in range(self.max_cnt):
             for col in range(self.col_cnt):
-                input_string += resultList[row][col][1:-1] + " "
-        wc = WordCounter(input_string)
+                input_string += resultList[row][col][1:-1] + ","
+            input_string += "\n"
+        
+        return input_string
 
     def QMenuUpdate(self, SearchCnt):
         start = self.menuSearchCount
@@ -667,6 +714,8 @@ class PokeDBWindow(QMainWindow, form_class):
 
         sql=sql[:-3]
         self.QTableUpdateList(self.DB_SendQuery(sql))
+        
+        
     
     def DB_SendQuery(self, sql):
         self.cursor.execute(sql)
@@ -684,6 +733,7 @@ class PokeDBWindow(QMainWindow, form_class):
         self.tabWidget.resize(w-20,h-40)
         self.treeWidget.resize(w-26,h-80)
         self.tableWidget.resize(w-26,h-80) #Table Resize
+        self.textBrowser.resize(w-26,h-80) #Table Resize
     
     
     def keyPressEvent(self, ev):
