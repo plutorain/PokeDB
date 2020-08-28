@@ -166,6 +166,7 @@
     </widget>
     <addaction name="menuSearch_Select"/>
     <addaction name="actionSearch_Text"/>
+    <addaction name="actionSearch_Japan_Name"/>
    </widget>
    <widget class="QMenu" name="menuTable">
     <property name="enabled">
@@ -226,6 +227,11 @@
   <action name="actionClear_Text_Marking">
    <property name="text">
     <string>Clear Text Marking</string>
+   </property>
+  </action>
+  <action name="actionSearch_Japan_Name">
+   <property name="text">
+    <string>Search Japan Name</string>
    </property>
   </action>
  </widget>

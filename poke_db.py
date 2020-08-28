@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 import mysql.connector
+import time
 
 #QT GUI
 import sys
@@ -21,6 +22,11 @@ import csv
 #PokeCard Browser
 import Poke_Card
 
+#JP Search
+#import Get_Card_info_JP
+import GetJPCard
+from PyQt5.QtCore import pyqtSignal, pyqtSlot
+
 
 try:
     from html import escape
@@ -28,7 +34,7 @@ except ImportError:
     from cgi import escape
 
 #from html.parser import HTMLParser
-from bs4 import BeautifulSoup
+#from bs4 import BeautifulSoup
 
 
 chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s'
@@ -43,102 +49,6 @@ config={
         "port":3306
     }
 
-
-'''    
-gMarkTextColor = QColor("orange")
-class HTMLDelegate(QStyledItemDelegate):
-    def __init__(self, color ,parent=None):
-        super(HTMLDelegate, self).__init__(parent)
-        self.doc = QTextDocument(self)
-        
-    def paint(self, painter, option, index):
-        substring = index.data(Qt.UserRole)
-        painter.save()
-        
-        options = QStyleOptionViewItem(option)
-        self.initStyleOption(options, index)
-        res = ""
-        global gMarkTextColor
-        color = gMarkTextColor
-        if(substring != None):
-            doc = QTextDocument(self)
-            doc.setHtml(options.text)
-            html = doc.toHtml()
-            print("------------------")
-            print("option text %s"%options.text)
-            
-            
-            print("-----------------------Original------------------------")
-            print(html)
-            print("--------------------------------------------------------")
-            #parser = HTMLParser()
-            #parser.feed(html)
-            print("Take Text1:")
-            soup = BeautifulSoup(html)
-            print(soup.p) 
-           
-            
-        if substring:
-            substrings = options.text.split(substring)
-            #print(substrings)
-            res = """<font color="{}">{}</font>""".format(
-                color.name(QColor.HexRgb), substring
-            ).join(list(map(escape, substrings)))
-        else:
-            res = escape(options.text)
-        if(substring != None):
-            print("Res:")
-            print(res)
-            
-            #print(self.doc.toHtml())
-        self.doc.setHtml(res)
-        if(substring != None):
-            print("Final html:")
-            print(self.doc.toHtml())
-        
-
-        options.text = ""
-        style = (
-            QApplication.style()
-            if options.widget is None
-            else options.widget.style()
-        )
-        style.drawControl(QStyle.CE_ItemViewItem, options, painter)
-
-        ctx = QAbstractTextDocumentLayout.PaintContext()
-        if option.state & QStyle.State_Selected:
-            ctx.palette.setColor(
-                QPalette.Text,
-                option.palette.color(
-                    QPalette.Active, QPalette.HighlightedText
-                ),
-            )
-        else:
-            ctx.palette.setColor(
-                QPalette.Text,
-                option.palette.color(QPalette.Active, QPalette.Text),
-            )
-
-        textRect = style.subElementRect(QStyle.SE_ItemViewItemText, options)
-
-        if index.column() != 0:
-            textRect.adjust(5, 0, 0, 0)
-
-        thefuckyourshitup_constant = 4
-        margin = (option.rect.height() - options.fontMetrics.height()) // 2
-        margin = margin - thefuckyourshitup_constant
-        textRect.setTop(textRect.top() + margin)
-
-        painter.translate(textRect.topLeft())
-        painter.setClipRect(textRect.translated(-textRect.topLeft()))
-        self.doc.documentLayout().draw(painter, ctx)
-
-        painter.restore()
-
-    def sizeHint(self, option, index):
-        #print("resize")
-        return QSize(self.doc.idealWidth(), self.doc.size().height())
-'''  
 class WordCounter():
     def __init__(self, input_string):
         print("WordCountinit")
@@ -174,6 +84,12 @@ class PokeScore():
 
         
 class PokeDBWindow(QMainWindow, form_class):
+    
+    request_url = pyqtSignal(list)
+    firstsig = pyqtSignal(dict)
+    sig_killbrowser = pyqtSignal(bool)
+    
+
     def __init__(self):
         super().__init__()
         self.setupUi(self)
@@ -206,6 +122,8 @@ class PokeDBWindow(QMainWindow, form_class):
         self.actionClearCell_Marking.triggered.connect(self.QTableCellMarkingClear)
         self.actionText_Marking.triggered.connect(self.QTableTextMarking)
         self.actionClear_Text_Marking.triggered.connect(self.QTableTextMarkingClear)
+        self.actionSearch_Japan_Name.triggered.connect(self.QMenuSearchJPName)
+
         
         self.QMenuEnableALL(self.menuTable ,False)
         self.QMenuEnableALL(self.menuSearch ,False)
@@ -231,8 +149,26 @@ class PokeDBWindow(QMainWindow, form_class):
         self.searchExeCnt = 0
         self.textBrowser.setEnabled(False)
         self.textBrowser.setReadOnly(True)
+
+
+        #JP Card Search
+        self.jpCard = None
+        self.jpCardWindow = Poke_Card.MyWindow()
+        self.jpCardWindow.setWindowTitle("JP Card Viewer")
+        self.jpCardWindow.setWindowIcon(QIcon("Pokemon.ico"))
+        self.BrowserRunning = False
         
     
+    def closeEvent(self, event):
+        print("closeEvent!!!")
+        if(self.BrowserRunning):
+            #self.jpCard.closeBrowser()
+            self.sig_killbrowser.emit(True)
+            self.jpCard.terminate()
+            self.jpCardWindow.close()
+        self.CardWindow.close()
+        
+
     
     def initQTableAction(self):
         #Url Open duble click!
@@ -241,13 +177,21 @@ class PokeDBWindow(QMainWindow, form_class):
         #Table Right Button Menu
         self.tableWidget.setContextMenuPolicy(Qt.ActionsContextMenu)
         copy_action = QAction("Copy", self.tableWidget) 
-        url_action = QAction("Open Current Row Card Page", self.tableWidget) 
+        url_action = QAction("Open Current Row Card Page", self.tableWidget)
+        jp_action = QAction("Search Japan Card", self.tableWidget)
+        findname_action = QAction("Search Japan Name", self.tableWidget)
         self.tableWidget.addAction(copy_action) 
         self.tableWidget.addAction(url_action)
+        self.tableWidget.addAction(jp_action)
+        self.tableWidget.addAction(findname_action)
         
         copy_action.triggered.connect(self.copySelection)
         url_action.triggered.connect(self.QTableRowOpenUrl)
         url_action.setShortcut('Ctrl+O')
+        
+        #jp_action.triggered.connect(self.QTableSearchJPCard)
+        jp_action.triggered.connect(self.QTableSearchJPCard2)
+        findname_action.triggered.connect(self.QTableSearchJPName)
         
         #Range Selection Event
         self.tableWidget.itemSelectionChanged.connect(self.QTableItemSelectionChanged)
@@ -647,7 +591,149 @@ class PokeDBWindow(QMainWindow, form_class):
                 print("Find CardNum!!! : %s "%CardNum)
                 webbrowser.get(chrome_path).open('https://pokemoncard.co.kr/cards/detail/'+CardNum)
     
+    def QTableSearchJPCard2(self):
+        print("Search JP Card!!")
+        #start = time.time()  # 시작 시간 저장
+        row=self.tableWidget.currentRow()
+        Series = self.tableWidget.item(row,45).text()
+
+        typelist = ["ALL","POKEMON", "TRAINERS", "ENERGY"]
+        CardType = typelist[int(self.tableWidget.item(row,5).text()[0])]
+        print("CardType:%s\nSeries : %s\n"%(CardType,Series))       
+
+        kor_name = self.tableWidget.item(row,7).text()
+        print(kor_name) 
+        jpname=self.SearchJPNameFromDB(kor_name) # GET JPNAME From DataBase
+
+        print("jpname :", jpname)
+        if(jpname == None): #Find JP name Fail
+            msg = "Can't Find JP Name\n"
+            msg+= ("KOR:%s , JP:%s, SERIES:%s"%(kor_name, jpname, Series))
+            self.MessageBox(msg)
+            return False
+        
+        if(self.BrowserRunning == False): #CurrentCard is Not Exsist - Need to luanch WebBrowser
+            self.jpCard = GetJPCard.JPCard()
+            self.jpCard.sendlist.connect(self.JPBrowserUrlListSignalSlot)
+            self.jpCard.init.connect(self.JPBrowserInitSignalSlot)
+            self.firstsig.connect(self.jpCard.getFirstSigSlot)
+            self.sig_killbrowser.connect(self.jpCard.closeBrowser)
+            self.request_url.connect(self.jpCard.getCardListSlot)
+            print("Main : Thread Start")
+            self.jpCard.start()
+            firstsig={"cardname": jpname,"cardtype" : CardType, "inputSeries" : Series, "hide" : True}
+            print("MAIN : SEND First SIGNAL!!")
+            self.firstsig.emit(firstsig)
+
+        else: #Search Again (WebBrowser Already Loaded)
+            print("Main : Send Signal List")
+            self.request_url.emit([jpname, CardType, Series])
+         
+    @pyqtSlot(bool)
+    def JPBrowserInitSignalSlot(self, isinit):
+        print("Main : Get Init Signal ")
+        if isinit: #QThread Running
+            print("Main : Init OK")
+            self.BrowserRunning = True
+        else: #Fail to Load
+            print("Init Fail")
+            self.jpCard.terminate()
+            self.jpCard = None
+            
     
+    @pyqtSlot(list)
+    def JPBrowserUrlListSignalSlot(self, link):
+        print("Main : Get URL List ")
+        if (len(link)>0):
+            if(len(link) == 1):
+                self.jpCardWindow.SetImageList(link)
+                
+            else: #More than 2
+                msg = "Please Check Card List!!"
+                self.MessageBox(msg)
+                self.jpCardWindow.SetImageList(link)
+            self.jpCardWindow.show()
+            self.jpCardWindow.activateWindow()
+        else:
+            msg = "Can't Find Proper Link!\n"
+            row=self.tableWidget.currentRow()
+            msg += "Series: %s"%self.tableWidget.item(row,45).text()
+            self.MessageBox(msg)
+
+    """ def QTableSearchJPCard(self):
+        print("Search JP Card!!")
+        start = time.time()  # 시작 시간 저장
+        row=self.tableWidget.currentRow()
+        Series = self.tableWidget.item(row,45).text()
+
+        typelist = ["ALL","POKEMON", "TRAINERS", "ENERGY"]
+        CardType = typelist[int(self.tableWidget.item(row,5).text()[0])]
+        print("CardType:%s\nSeries : %s\n"%(CardType,Series))       
+
+        kor_name = self.tableWidget.item(row,7).text()
+        print(kor_name) 
+        jpname=self.SearchJPNameFromDB(kor_name) # GET JPNAME From DataBase
+
+        print("jpname :", jpname)
+        if(jpname == None): #Find JP name Fail
+            msg = "Can't Find JP Name\n"
+            msg+= ("KOR:%s , JP:%s, SERIES:%s"%(kor_name, jpname, Series))
+            self.MessageBox(msg)
+            return False
+        
+        link = None
+        if(self.jpCard == None): #CurrentCard is Not Exsist - Need to luanch WebBrowser
+            self.jpCard = Get_Card_info_JP.JPCard(jpname, CardType, Series, hide=True)
+            if (self.jpCard.IsInitOK()): #JP InitFinish (KeyError Exception Current Ver only for Standard Card)
+                link=self.jpCard.getCardLink()
+            else: #Init Fail 
+                print("Remove JP Card Object")
+                del self.jpCard
+                self.jpCard = None
+        else: #Search Again (WebBrowser Already Loaded)
+            link=self.jpCard.SearchAgain(jpname, CardType, Series)
+
+        if (link!= None):
+            if(len(link) == 1):
+                self.jpCardWindow.LoadImage(link[0])
+            else: #More than 2
+                msg = "Please Check Card List!!"
+                self.MessageBox(msg)
+                self.jpCardWindow.SetImageList(link)
+            self.jpCardWindow.show()
+            self.jpCardWindow.activateWindow()
+        else:
+            msg = "Can't Find Proper Link!\n"
+            msg+= ("KOR:%s , JP:%s, SERIES:%s"%(kor_name, jpname, Series))
+            self.MessageBox(msg)
+        print("Elapsed Time :", time.time() - start) """
+
+
+    def QTableSearchJPName(self):
+        print("QTableSearchJPName")
+        row=self.tableWidget.currentRow()
+        kor_name = self.tableWidget.item(row,7).text()
+        print(kor_name) 
+        jpname=self.SearchJPNameFromDB(kor_name)
+        self.MessageBox("JP NAME :"+jpname)
+
+    def QMenuSearchJPName(self):
+        print("QMenuSearchJPName")
+        txt, ok = QInputDialog.getText(self, 'InputWindow', 'Search Text')
+        if ok:
+            jpname=self.SearchJPNameFromDB(txt)
+            self.MessageBox("JP NAME :"+jpname)
+
+    def SearchJPNameFromDB(self, kor_name):
+        sql = "SELECT * FROM `pokecard`.`name` WHERE KOR LIKE \"" + kor_name +'"'
+        res = self.DB_SendQuery(sql)
+        
+        if(len(res)>0):
+            print("JP : %s, KOR: %s"%(res[0][0],res[0][1]))
+            return res[0][0]
+        else:
+            return None
+
     def QTableCellMarking(self):
         txt, ok = QInputDialog.getText(self, 'InputWindow', 'Search Text')
         if ok:
