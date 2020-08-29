@@ -92,6 +92,16 @@
      <string>Next</string>
     </property>
    </widget>
+   <widget class="QWidget" name="widgetProgress" native="true">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>10</y>
+      <width>361</width>
+      <height>31</height>
+     </rect>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">

@@ -20,7 +20,7 @@ class MyWindow(QMainWindow, form_class):
         self.imglist = []
         self.nowimg = 0
 
-        #self.webView.page.DownloadImageToDisk.connect(self.webView_SaveImage)
+        self.ProgressBar = None
 
     def btn_clicked(self):
         detail_code = self.textEdit.toPlainText()
@@ -43,6 +43,22 @@ class MyWindow(QMainWindow, form_class):
         self.webView.load(url)
         self.webView.show()
 
+    def SetCountry(self, Country):
+        if(Country == "JPN"):
+            self.textEdit.deleteLater()
+            self.pushButton.deleteLater()
+            self.widgetProgress
+            self.ProgressBar=QProgressBar(self.widgetProgress)
+            self.ProgressBar.setRange(0,100)
+            self.ProgressBar.resize(395,31)
+            print("PokeCard Progress Bar(w:%d,h:%d)"%(self.ProgressBar.width(), self.ProgressBar.height()))
+            
+
+        elif(Country == "KOR"):
+            self.pushButton_Next.deleteLater()
+            self.pushButton_Prev.deleteLater()
+    
+
     def LoadCurrentImage(self):
         if(len(self.imglist) == 0):
             return False
@@ -50,8 +66,12 @@ class MyWindow(QMainWindow, form_class):
         
     def SetImageList(self, ImgLinkList):
         self.imglist =[]
-        self.SetEnableNextPrevBttn(True)
+        
         self.imglist = ImgLinkList
+        if(len(self.imglist)>1):
+            self.SetEnableNextPrevBttn(True)
+        else:
+            self.SetEnableNextPrevBttn(False)
         self.nowimg = 0
         self.LoadCurrentImage()
 
@@ -68,7 +88,7 @@ class MyWindow(QMainWindow, form_class):
     def SetEnableNextPrevBttn(self, isEnable):
         self.pushButton_Prev.setEnabled(isEnable)
         self.pushButton_Next.setEnabled(isEnable)
-        self.imglist = []
+        
 
     def setInputText(self,string):
         self.textEdit.setText(string)
@@ -81,9 +101,14 @@ class MyWindow(QMainWindow, form_class):
         w = self.width()
         self.webView.resize(w-25,h-110)
 
+    def closeEvent(self, event):
+        print("Thread closeEvent!!!")
+        
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     myWindow = MyWindow()
+    myWindow.SetCountry("JPN")
     myWindow.show()
     app.exec_()

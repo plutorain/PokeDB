@@ -8,8 +8,6 @@ from PyQt5.QtWidgets import *
 from PyQt5 import uic 
 from PyQt5.QtGui import *
 from PyQt5.QtCore import Qt
-from PyQt5.QtCore import QPoint
-from PyQt5.QtCore import QSize
 form_class = uic.loadUiType("PokeDBWindow.ui")[0]
 
 #WEB BROWSER
@@ -86,7 +84,7 @@ class PokeScore():
 class PokeDBWindow(QMainWindow, form_class):
     
     request_url = pyqtSignal(list)
-    firstsig = pyqtSignal(dict)
+    firstsig = pyqtSignal(list)
     sig_killbrowser = pyqtSignal(bool)
     
 
@@ -142,6 +140,7 @@ class PokeDBWindow(QMainWindow, form_class):
         
         #PokeCard Window
         self.CardWindow = Poke_Card.MyWindow()
+        self.CardWindow.SetCountry("KOR")
         self.CardWindow.setWindowTitle("PokeCard Viewer")
         self.CardWindow.setWindowIcon(QIcon("Pokemon.ico"))
         
@@ -154,6 +153,8 @@ class PokeDBWindow(QMainWindow, form_class):
         #JP Card Search
         self.jpCard = None
         self.jpCardWindow = Poke_Card.MyWindow()
+        self.jpCardWindow.SetCountry("JPN")
+        #self.jpCardWindow.ProgressBar.setValue
         self.jpCardWindow.setWindowTitle("JP Card Viewer")
         self.jpCardWindow.setWindowIcon(QIcon("Pokemon.ico"))
         self.BrowserRunning = False
@@ -577,7 +578,7 @@ class PokeDBWindow(QMainWindow, form_class):
                 if(CardNum != ""):
                     print("Find CardNum!!! : %s "%CardNum)
                     self.CardWindow.setInputText(CardNum)
-                    self.CardWindow.btn_clicked()
+                    self.CardWindow.btn_clicked()                    
                     self.CardWindow.show()
                     self.CardWindow.activateWindow()
                     
@@ -597,6 +598,13 @@ class PokeDBWindow(QMainWindow, form_class):
         row=self.tableWidget.currentRow()
         Series = self.tableWidget.item(row,45).text()
 
+        sql = 'SELECT * FROM `pokecard`.`series` WHERE KRSeries LIKE "'+Series+'"'
+        res=self.DB_SendQuery(sql)
+        pageNo = 0
+        if(len(res)>0):
+            print("PAGE NO: %s, JPN: %s, KOR: %s "%(res[0][0],res[0][1],res[0][2]))
+            pageNo = res[0][0]
+
         typelist = ["ALL","POKEMON", "TRAINERS", "ENERGY"]
         CardType = typelist[int(self.tableWidget.item(row,5).text()[0])]
         print("CardType:%s\nSeries : %s\n"%(CardType,Series))       
@@ -614,20 +622,24 @@ class PokeDBWindow(QMainWindow, form_class):
         
         if(self.BrowserRunning == False): #CurrentCard is Not Exsist - Need to luanch WebBrowser
             self.jpCard = GetJPCard.JPCard()
-            self.jpCard.sendlist.connect(self.JPBrowserUrlListSignalSlot)
-            self.jpCard.init.connect(self.JPBrowserInitSignalSlot)
-            self.firstsig.connect(self.jpCard.getFirstSigSlot)
-            self.sig_killbrowser.connect(self.jpCard.closeBrowser)
-            self.request_url.connect(self.jpCard.getCardListSlot)
+            self.jpCard.progress.connect(self.jpCardWindow.ProgressBar.setValue)
+            self.jpCard.sendlist.connect(self.JPBrowserUrlListSignalSlot) #QThread -> Main (Search Result Msg)
+            self.jpCard.init.connect(self.JPBrowserInitSignalSlot) #QThread -> Main (Browser Init Msg)
+            self.firstsig.connect(self.jpCard.getFirstSigSlot) #Main -> QThread (First Search Msg)
+            self.sig_killbrowser.connect(self.jpCard.closeBrowser) #Main -> QThread (Kill Brower Msg)
+            self.request_url.connect(self.jpCard.getCardListSlot) #Main -> QThread (Search Again Msg)
             print("Main : Thread Start")
+            self.jpCardWindow.show()#For ProgressBar Show First
             self.jpCard.start()
-            firstsig={"cardname": jpname,"cardtype" : CardType, "inputSeries" : Series, "hide" : True}
+            firstsig = [jpname,CardType, Series, pageNo, True] # [CARDNAME, CARDTYPE, SERIES, PageNo ,HIDE_BROWSER]
             print("MAIN : SEND First SIGNAL!!")
-            self.firstsig.emit(firstsig)
+            self.firstsig.emit(firstsig) 
+            #self.firstsig.emit(firstsig) #Prevent to RcvFail
+
 
         else: #Search Again (WebBrowser Already Loaded)
             print("Main : Send Signal List")
-            self.request_url.emit([jpname, CardType, Series])
+            self.request_url.emit([jpname, CardType, Series, pageNo])
          
     @pyqtSlot(bool)
     def JPBrowserInitSignalSlot(self, isinit):
@@ -660,69 +672,20 @@ class PokeDBWindow(QMainWindow, form_class):
             msg += "Series: %s"%self.tableWidget.item(row,45).text()
             self.MessageBox(msg)
 
-    """ def QTableSearchJPCard(self):
-        print("Search JP Card!!")
-        start = time.time()  # 시작 시간 저장
-        row=self.tableWidget.currentRow()
-        Series = self.tableWidget.item(row,45).text()
-
-        typelist = ["ALL","POKEMON", "TRAINERS", "ENERGY"]
-        CardType = typelist[int(self.tableWidget.item(row,5).text()[0])]
-        print("CardType:%s\nSeries : %s\n"%(CardType,Series))       
-
-        kor_name = self.tableWidget.item(row,7).text()
-        print(kor_name) 
-        jpname=self.SearchJPNameFromDB(kor_name) # GET JPNAME From DataBase
-
-        print("jpname :", jpname)
-        if(jpname == None): #Find JP name Fail
-            msg = "Can't Find JP Name\n"
-            msg+= ("KOR:%s , JP:%s, SERIES:%s"%(kor_name, jpname, Series))
-            self.MessageBox(msg)
-            return False
-        
-        link = None
-        if(self.jpCard == None): #CurrentCard is Not Exsist - Need to luanch WebBrowser
-            self.jpCard = Get_Card_info_JP.JPCard(jpname, CardType, Series, hide=True)
-            if (self.jpCard.IsInitOK()): #JP InitFinish (KeyError Exception Current Ver only for Standard Card)
-                link=self.jpCard.getCardLink()
-            else: #Init Fail 
-                print("Remove JP Card Object")
-                del self.jpCard
-                self.jpCard = None
-        else: #Search Again (WebBrowser Already Loaded)
-            link=self.jpCard.SearchAgain(jpname, CardType, Series)
-
-        if (link!= None):
-            if(len(link) == 1):
-                self.jpCardWindow.LoadImage(link[0])
-            else: #More than 2
-                msg = "Please Check Card List!!"
-                self.MessageBox(msg)
-                self.jpCardWindow.SetImageList(link)
-            self.jpCardWindow.show()
-            self.jpCardWindow.activateWindow()
-        else:
-            msg = "Can't Find Proper Link!\n"
-            msg+= ("KOR:%s , JP:%s, SERIES:%s"%(kor_name, jpname, Series))
-            self.MessageBox(msg)
-        print("Elapsed Time :", time.time() - start) """
-
-
     def QTableSearchJPName(self):
         print("QTableSearchJPName")
         row=self.tableWidget.currentRow()
         kor_name = self.tableWidget.item(row,7).text()
         print(kor_name) 
         jpname=self.SearchJPNameFromDB(kor_name)
-        self.MessageBox("JP NAME :"+jpname)
+        self.MessageBox(jpname)
 
     def QMenuSearchJPName(self):
         print("QMenuSearchJPName")
         txt, ok = QInputDialog.getText(self, 'InputWindow', 'Search Text')
         if ok:
             jpname=self.SearchJPNameFromDB(txt)
-            self.MessageBox("JP NAME :"+jpname)
+            self.MessageBox(jpname)
 
     def SearchJPNameFromDB(self, kor_name):
         sql = "SELECT * FROM `pokecard`.`name` WHERE KOR LIKE \"" + kor_name +'"'
@@ -801,7 +764,6 @@ class PokeDBWindow(QMainWindow, form_class):
         sql=sql[:-3]
         self.QTableUpdateList(self.DB_SendQuery(sql))
         
-        
     
     def DB_SendQuery(self, sql):
         self.cursor.execute(sql)
@@ -809,9 +771,18 @@ class PokeDBWindow(QMainWindow, form_class):
     
     def MessageBox(self,msg):
         w = QWidget()
-        Mbox=QMessageBox()
-        w.move(self.pos().x()+(self.width()-Mbox.width())/2,self.pos().y()+(self.height()-Mbox.height())/2)
-        Mbox.information(w, "Information", msg)
+        Mbox=QMessageBox(w)
+        Mbox.setWindowTitle("Message")
+        Mbox.setWindowIcon(QIcon("Pokemon.ico"))
+        Mbox.setStyleSheet("messagebox-text-interaction-flags : 5;")
+        Mbox.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        Mbox.setText(msg)
+        w.move(self.pos().x()+(self.width()-w.width())/2,self.pos().y()+(self.height()-w.height())/2)
+        #w.setWindowIcon
+        #Mbox=QMessageBox(w)
+        Mbox.exec()
+        #Mbox.move(self.pos().x()+(self.width()-Mbox.width())/2,self.pos().y()+(self.height()-Mbox.height())/2)
+        #Mbox.information(w, "Information", msg)
     
     def resizeEvent(self,event):
         h = self.height()
@@ -841,7 +812,6 @@ class PokeDBWindow(QMainWindow, form_class):
             stream = io.StringIO()
             csv.writer(stream, delimiter='\t').writerows(table)
             QApplication.clipboard().mimeData().setText(stream.getvalue())
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
