@@ -36,6 +36,7 @@ except ImportError:
 
 
 chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s'
+HIDE_BROWSER = True
 
 
 #DB 접속정보를 dict type 으로 준비한다.
@@ -602,7 +603,7 @@ class PokeDBWindow(QMainWindow, form_class):
         res=self.DB_SendQuery(sql)
         pageNo = 0
         if(len(res)>0):
-            print("PAGE NO: %s, JPN: %s, KOR: %s "%(res[0][0],res[0][1],res[0][2]))
+            print("MAIN PAGE NO: %s, JPN: %s, KOR: %s "%(res[0][0],res[0][1],res[0][2]))
             pageNo = res[0][0]
 
         typelist = ["ALL","POKEMON", "TRAINERS", "ENERGY"]
@@ -610,15 +611,16 @@ class PokeDBWindow(QMainWindow, form_class):
         print("CardType:%s\nSeries : %s\n"%(CardType,Series))       
 
         kor_name = self.tableWidget.item(row,7).text()
-        print(kor_name) 
-        jpname=self.SearchJPNameFromDB(kor_name) # GET JPNAME From DataBase
+        print("MAIN", kor_name)
+        jpname=self.SearchJPNameFromDB(self.GetOriginalName(kor_name)) # GET JPNAME From DataBase
 
         print("jpname :", jpname)
         if(jpname == None): #Find JP name Fail
             msg = "Can't Find JP Name\n"
             msg+= ("KOR:%s , JP:%s, SERIES:%s"%(kor_name, jpname, Series))
             self.MessageBox(msg)
-            return False
+            print("MAIN : FAIL FOUND JP NAME\n")
+            return None
         
         if(self.BrowserRunning == False): #CurrentCard is Not Exsist - Need to luanch WebBrowser
             self.jpCard = GetJPCard.JPCard()
@@ -631,15 +633,14 @@ class PokeDBWindow(QMainWindow, form_class):
             print("Main : Thread Start")
             self.jpCardWindow.show()#For ProgressBar Show First
             self.jpCard.start()
-            firstsig = [jpname,CardType, Series, pageNo, True] # [CARDNAME, CARDTYPE, SERIES, PageNo ,HIDE_BROWSER]
+            firstsig = [jpname,CardType, Series, pageNo, HIDE_BROWSER] # [CARDNAME, CARDTYPE, SERIES, PageNo ,HIDE_BROWSER]
             print("MAIN : SEND First SIGNAL!!")
             self.firstsig.emit(firstsig) 
             #self.firstsig.emit(firstsig) #Prevent to RcvFail
-
-
         else: #Search Again (WebBrowser Already Loaded)
             print("Main : Send Signal List")
             self.request_url.emit([jpname, CardType, Series, pageNo])
+        print("MAIN : FINISH REQUEST\n")
          
     @pyqtSlot(bool)
     def JPBrowserInitSignalSlot(self, isinit):
@@ -651,6 +652,7 @@ class PokeDBWindow(QMainWindow, form_class):
             print("Init Fail")
             self.jpCard.terminate()
             self.jpCard = None
+            self.BrowserRunning = False
             
     
     @pyqtSlot(list)
@@ -676,15 +678,26 @@ class PokeDBWindow(QMainWindow, form_class):
         print("QTableSearchJPName")
         row=self.tableWidget.currentRow()
         kor_name = self.tableWidget.item(row,7).text()
-        print(kor_name) 
-        jpname=self.SearchJPNameFromDB(kor_name)
+        #print(kor_name) 
+        print(self.GetOriginalName(kor_name))
+        jpname=self.SearchJPNameFromDB(self.GetOriginalName(kor_name))
         self.MessageBox(jpname)
+
+    def GetOriginalName(self,kor_name):
+        kor_name=kor_name.replace(" VMAX" ,"")
+        kor_name=kor_name.replace(" EX","")
+        kor_name=kor_name.replace(" GX","")
+        kor_name=kor_name.replace("M","")
+        kor_name=kor_name.replace(" LV.X","")
+        kor_name=kor_name.replace("[s]프리즘스타[/s]" ,"")
+        kor_name=kor_name.replace(" V" ,"")
+        return kor_name
 
     def QMenuSearchJPName(self):
         print("QMenuSearchJPName")
-        txt, ok = QInputDialog.getText(self, 'InputWindow', 'Search Text')
+        kor_name, ok = QInputDialog.getText(self, 'InputWindow', 'Search Text')
         if ok:
-            jpname=self.SearchJPNameFromDB(txt)
+            jpname=self.SearchJPNameFromDB(self.GetOriginalName(kor_name))
             self.MessageBox(jpname)
 
     def SearchJPNameFromDB(self, kor_name):
