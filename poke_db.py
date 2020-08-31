@@ -564,6 +564,8 @@ class PokeDBWindow(QMainWindow, form_class):
             self.textBrowser.setEnabled(True)
             print("Connect OK")
             self.MessageBox("Connected!!!")
+        self.tableAddList = []
+        self.tableUpdateList = []
         
     def SendALL_DB(self):
         print("SendALLDB")
@@ -902,6 +904,7 @@ class PokeDBWindow(QMainWindow, form_class):
     def QTableCellMarking(self):
         txt, ok = QInputDialog.getText(self, 'InputWindow', 'Search Text')
         if ok:
+            self.QTableCellChangeSetEnable(False)
             color = QColorDialog.getColor()
             color.setAlpha(100)
             allitems = self.tableWidget.findItems("", Qt.MatchContains)
@@ -909,10 +912,21 @@ class PokeDBWindow(QMainWindow, form_class):
             for item in allitems:
                 if item in selected_items:
                     item.setBackground(color)
+            self.QTableCellChangeSetEnable(True)
     
+    def QTableCellChangeSetEnable(self, isOn):
+        if isOn:
+            self.tableWidget.cellChanged.connect(self.QTableCellChanged)
+        else:
+            receiversCount = self.tableWidget.receivers(self.tableWidget.cellChanged)
+            if receiversCount > 0:
+                self.tableWidget.cellChanged.disconnect()
+
+
     def QTableTextMarking(self):
         txt, ok = QInputDialog.getText(self, 'InputWindow', 'Search Text')
         if ok:
+            self.QTableCellChangeSetEnable(False)
             color = QColorDialog.getColor()
             global gMarkTextColor 
             gMarkTextColor = color
@@ -922,41 +936,39 @@ class PokeDBWindow(QMainWindow, form_class):
                 if item in selected_items:
                     item.setForeground(color)
                     #item.setData(Qt.UserRole, txt if item in selected_items else None)
+            self.QTableCellChangeSetEnable(True)
                 
     def QTableCellMarkingClear(self):
         allitems = self.tableWidget.findItems("", Qt.MatchContains)
+        self.QTableCellChangeSetEnable(False)
         for item in allitems:
             if(item != None):
                 item.setBackground(QColor(255,255,255))
+        self.QTableCellChangeSetEnable(True)
                 
     def QTableTextMarkingClear(self):
         global gMarkTextColor 
         gMarkTextColor = QColor(0,0,0)
         allitems = self.tableWidget.findItems("", Qt.MatchContains)
+        self.QTableCellChangeSetEnable(False)
         for item in allitems:
             if(item != None):
                 item.setForeground(QColor(0,0,0))
+        self.QTableCellChangeSetEnable(True)
     
     def QTableUpdateList(self,resultList):
         self.max_cnt = len(resultList)
         self.tableWidget.setRowCount(self.max_cnt)        
-        #self.tableWidget.cellChanged.disconnect()
-        #self.receivers()
-        #PYQT_SIGNAL()
-        
-        #ReceiverCount Check & Disconnect!!!
-        receiversCount = self.tableWidget.receivers(self.tableWidget.cellChanged)
-        if receiversCount > 0:
-            self.tableWidget.cellChanged.disconnect()
-
+        self.QTableCellChangeSetEnable(False)
         for row in range(self.max_cnt):
             for col in range(self.col_cnt):
                 if (self.DBTableNow == "cardinfo"):
                     self.tableWidget.setItem(row, col, QTableWidgetItem(resultList[row][col][1:-1]))
                 else:
                     self.tableWidget.setItem(row, col, QTableWidgetItem(resultList[row][col]))
-        self.tableWidget.cellChanged.connect(self.QTableCellChanged)
+        self.QTableCellChangeSetEnable(True)
         self.tableAddList = [] #Init Added List 
+        self.tableUpdateList = [] #Init Update List
     
     def QTableUpdateColumn(self):
         sql="SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='%s'"%self.DBTableNow

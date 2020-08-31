@@ -275,10 +275,12 @@ class JPCard(QThread):
                 
         self.UpdateProgress(10)
 
-        if(self.IsStandard):
+        JPSeriesCount = 1 #NonStandard Loop-1time
+        if(pageNo == 0): #Standard Case Get Series Count
             JPSeriesCount = len(JPNameDic[inputSeries])
             print("QThread : Current KR Series incldue %d JP Series "%JPSeriesCount)
             print("pageNo", pageNo, type(pageNo))
+
         for JPindex in range(JPSeriesCount):
             print("QThread Start: JPIndex-%d"%JPindex)
             #Check URL Change Standard <-> NoneStandard
@@ -287,6 +289,7 @@ class JPCard(QThread):
                     print("Keep Current URL : Standard")
                     self.prev_pageNo = pageNo
                     self.LoadBttn() #For FirstLoad Case
+                    changed = False
                 else:
                     print("Change URL : Standard->%s"%pageNo)
                     self.mainpage = "https://www.pokemon-card.com/card-search/index.php?mode=statuslist&pg="+pageNo
@@ -332,7 +335,6 @@ class JPCard(QThread):
                         self.msleep(100)
                         print("QThread OptionSpan CHECK!!: ",self.SearchOptionSpan.find_element_by_tag_name("div").get_attribute("class"))
                 print("QThread OptionSpan OK!!")    
-                
                 self.driver.implicitly_wait(5)
                 self.currentType = cardtype    
             self.UpdateProgress(30)
