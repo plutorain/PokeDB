@@ -111,9 +111,6 @@
         <height>451</height>
        </rect>
       </property>
-      <property name="editTriggers">
-       <set>QAbstractItemView::NoEditTriggers</set>
-      </property>
      </widget>
     </widget>
     <widget class="QWidget" name="tab3">
@@ -148,6 +145,7 @@
      <string>Connect</string>
     </property>
     <addaction name="actionConnect_To_DataBase"/>
+    <addaction name="actionSelect_Table"/>
    </widget>
    <widget class="QMenu" name="menuSearch">
     <property name="enabled">
@@ -232,6 +230,14 @@
   <action name="actionSearch_Japan_Name">
    <property name="text">
     <string>Search Japan Name</string>
+   </property>
+  </action>
+  <action name="actionSelect_Table">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Select Table</string>
    </property>
   </action>
  </widget>

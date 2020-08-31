@@ -101,10 +101,6 @@ class MyWindow(QMainWindow, form_class):
         w = self.width()
         self.webView.resize(w-25,h-110)
 
-    def closeEvent(self, event):
-        print("Thread closeEvent!!!")
-        
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

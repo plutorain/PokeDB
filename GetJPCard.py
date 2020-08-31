@@ -176,6 +176,7 @@ class JPCard(QThread):
     cardtype = None
     BrowserRunning = False
     cardlist = []
+    currentType = None
 
     def run(self):
         self.mainpage = None
@@ -229,41 +230,17 @@ class JPCard(QThread):
             self.driver.get(self.mainpage)
             self.driver.implicitly_wait(5)
             self.UpdateProgress(30) #30%
-            self.prev_pageNo = pageNo ##IMPORTANT
             
-            self.LoadBttn()
-            
-            self.currentType = cardtype
-            self.SelectCardType(cardtype)
-            self.UpdateProgress(30) #35% CardType Select Complete
-            if self.IsStandard:
-                self.SearchOptionSpan.click()
-                while True:
-                    if(self.SearchOptionSpan.find_element_by_tag_name("div").get_attribute("class") == "AddFilterButton js-active"):
-                        print("QThread OptionSpan OK: ",self.SearchOptionSpan.find_element_by_tag_name("div").get_attribute("class"))  
-                        break
-                    else:
-                        self.msleep(100)
-                        print("QThread OptionSpan CHECK!!: ",self.SearchOptionSpan.find_element_by_tag_name("div").get_attribute("class"))
-                #self.driver.implicitly_wait(5)
-                
-                self.StandardSeriesSlect(inputSeries,cardtype)
-                print("-------------------------------------------")
-                print("QThread Init", self.SeriesOptionSpan.get_attribute("class")) #groupSubList groupSubList-toggle
-                print("-------------------------------------------")
-
-            self.UpdateProgress(40) #40% SeriesSelect Complete
-            self.driver.implicitly_wait(5)
-            self.searchBoxWrite(cardname)
-            self.UpdateProgress(50) #50% WriteSearchBox Complete
-            
-            self.init.emit(True) #Initiallize OK Send to Main
+            #([jpname, CardType, Series, pageNo])
+            self.init.emit(True)
             self.BrowserRunning = True
-            self.sendlist.emit(self.getCardLink()) # UrlList Send to MAIN
-            self.UpdateProgress(100) #100%
+            self.RequestMsg = [cardname,cardtype,inputSeries,pageNo]
+            self.RequestURL = True
+            #print("")
         else:
             self.sendlist.emit([]) # UrlList Send to MAIN
             self.UpdateProgress(100) #100%
+            self.init.emit(False)
 
         while(True): #Request URL Wait Loop
             if(self.RequestURL): #Search Again Msg Get From Main
@@ -292,76 +269,86 @@ class JPCard(QThread):
         self.cardlist = []
         self.UpdateProgress(0)
         changed = False
-        
+        link = []
         if (self.SeriesNameCheck(inputSeries, pageNo) == False): #Standard Series Check
             return []
                 
-        self.UpdateProgress(10)    
-        #Check URL Change Standard <-> NoneStandard
-        if(self.IsStandard): #Current Standard
-            if (pageNo==0): #Standard
-                print("Keep Current URL : Standard")
-            else:
-                print("Change URL : Standard->%s"%pageNo)
-                self.mainpage = "https://www.pokemon-card.com/card-search/index.php?mode=statuslist&pg="+pageNo
-                self.prev_pageNo = pageNo
-                self.driver.get(self.mainpage)
-                self.driver.implicitly_wait(5)
-                self.IsStandard = False
-                self.LoadBttn()
-                changed = True
-        else: #Current NoneStandard
-            if (pageNo==0): #Standard
-                print("Change URL : %s -> Standard"%self.prev_pageNo)
-                self.mainpage = "https://www.pokemon-card.com/card-search"
-                self.prev_pageNo = 0 ##IMPORTANT
-                self.driver.get(self.mainpage)
-                self.driver.implicitly_wait(5)
-                self.IsStandard = True
-                self.LoadBttn()
-                changed = True
+        self.UpdateProgress(10)
 
-            elif(self.prev_pageNo != pageNo):
-                print("Change URL : %s -> %s"%(self.prev_pageNo, pageNo))
-                self.prev_pageNo = pageNo ##IMPORTANT!!! 
-                self.mainpage = "https://www.pokemon-card.com/card-search/index.php?mode=statuslist&pg="+pageNo
-                self.driver.get(self.mainpage)
-                self.driver.implicitly_wait(5)
-                self.IsStandard = False
-                self.LoadBttn()
-                changed = True
-
-        self.UpdateProgress(20)    
-        self.searchBoxWrite("\b\b\b\b\b\b\b\b\b\b\b\b\b")
-
-        if((self.currentType != cardtype) or changed):
-            self.SelectCardType(cardtype)
-            self.SearchOptionSpan.click()
-            print("QThread OptionSpan CLICK!!")
-            while True:
-                if(self.SearchOptionSpan.find_element_by_tag_name("div").get_attribute("class") == "AddFilterButton js-active" ):
-                    print("QThread OptionSpan OK: ",self.SearchOptionSpan.find_element_by_tag_name("div").get_attribute("class"))    
-                    break
+        if(self.IsStandard):
+            JPSeriesCount = len(JPNameDic[inputSeries])
+            print("QThread : Current KR Series incldue %d JP Series "%JPSeriesCount)
+            print("pageNo", pageNo, type(pageNo))
+        for JPindex in range(JPSeriesCount):
+            print("QThread Start: JPIndex-%d"%JPindex)
+            #Check URL Change Standard <-> NoneStandard
+            if(self.IsStandard): #Current Standard
+                if (pageNo==0): #Standard
+                    print("Keep Current URL : Standard")
+                    self.prev_pageNo = pageNo
+                    self.LoadBttn() #For FirstLoad Case
                 else:
-                    self.msleep(100)
-                    print("QThread OptionSpan CHECK!!: ",self.SearchOptionSpan.find_element_by_tag_name("div").get_attribute("class"))
-            print("QThread OptionSpan OK!!")    
-            
-            self.driver.implicitly_wait(5)
-            self.currentType = cardtype    
-        self.UpdateProgress(30)
-        
-        if self.IsStandard:
-            self.StandardSeriesSlect(inputSeries, cardtype)
+                    print("Change URL : Standard->%s"%pageNo)
+                    self.mainpage = "https://www.pokemon-card.com/card-search/index.php?mode=statuslist&pg="+pageNo
+                    self.prev_pageNo = pageNo
+                    self.driver.get(self.mainpage)
+                    self.driver.implicitly_wait(5)
+                    self.IsStandard = False
+                    self.LoadBttn()
+                    changed = True
+            else: #Current NoneStandard
+                if (pageNo==0): #Standard
+                    print("Change URL : %s -> Standard"%self.prev_pageNo)
+                    self.mainpage = "https://www.pokemon-card.com/card-search"
+                    self.prev_pageNo = 0 ##IMPORTANT
+                    self.driver.get(self.mainpage)
+                    self.driver.implicitly_wait(5)
+                    self.IsStandard = True
+                    self.LoadBttn()
+                    changed = True
 
-        self.UpdateProgress(40)
-        self.searchBoxWrite(cardname)
-        self.UpdateProgress(50)
-        link = self.getCardLink()
-        self.UpdateProgress(100)
+                elif(self.prev_pageNo != pageNo):
+                    print("Change URL : %s -> %s"%(self.prev_pageNo, pageNo))
+                    self.prev_pageNo = pageNo ##IMPORTANT!!! 
+                    self.mainpage = "https://www.pokemon-card.com/card-search/index.php?mode=statuslist&pg="+pageNo
+                    self.driver.get(self.mainpage)
+                    self.driver.implicitly_wait(5)
+                    self.IsStandard = False
+                    self.LoadBttn()
+                    changed = True
+
+            self.UpdateProgress(20)    
+            self.searchBoxWrite("\b\b\b\b\b\b\b\b\b\b\b\b\b")
+
+            if((self.currentType != cardtype) or changed):
+                self.SelectCardType(cardtype)
+                self.SearchOptionSpan.click()
+                print("QThread OptionSpan CLICK!!")
+                while True:
+                    if(self.SearchOptionSpan.find_element_by_tag_name("div").get_attribute("class") == "AddFilterButton js-active" ):
+                        print("QThread OptionSpan OK: ",self.SearchOptionSpan.find_element_by_tag_name("div").get_attribute("class"))    
+                        break
+                    else:
+                        self.msleep(100)
+                        print("QThread OptionSpan CHECK!!: ",self.SearchOptionSpan.find_element_by_tag_name("div").get_attribute("class"))
+                print("QThread OptionSpan OK!!")    
+                
+                self.driver.implicitly_wait(5)
+                self.currentType = cardtype    
+            self.UpdateProgress(30)
+            
+            if self.IsStandard:
+                self.StandardSeriesSlect(inputSeries, cardtype, JPindex)
+
+            self.UpdateProgress(40)
+            self.searchBoxWrite(cardname)
+            self.UpdateProgress(50)
+            link += self.getCardLink()
+            self.UpdateProgress(100)
+        #END FOR LOOP
         return link
 
-    def StandardSeriesSlect(self, inputSeries, cardtype):
+    def StandardSeriesSlect(self, inputSeries, cardtype , JPindex):
         self.SeriesOptionSpan = self.driver.find_element_by_xpath("//*[@id=\"CardSearchForm\"]/div/div[3]/div/div/div[4]/div[2]/div[2]")
         self.SeriesOptionSpan.click()
         while True:
@@ -369,8 +356,8 @@ class JPCard(QThread):
                 print("QThread SeriesSpan OK:", self.SeriesOptionSpan.get_attribute("class"))
                 break
         self.driver.implicitly_wait(5)
-        print(inputSeries,":",self.findSeriesXpath(inputSeries, cardtype))
-        SeriesRadioBttn = self.driver.find_element_by_xpath( self.findSeriesXpath(inputSeries, cardtype) )
+        print(inputSeries,":",self.findSeriesXpath(inputSeries, cardtype, JPindex))
+        SeriesRadioBttn = self.driver.find_element_by_xpath( self.findSeriesXpath(inputSeries, cardtype , JPindex) )
         print("QThread RadioButton Find!!:",SeriesRadioBttn.find_element_by_class_name("KSFormText").text)
         SeriesRadioBttn.click()
         self.driver.implicitly_wait(5)
@@ -446,8 +433,8 @@ class JPCard(QThread):
             cnt+=1
         return new_txt
 
-    def findSeriesXpath(self,SeriesString, cardtype):
-        SearchStr = JPNameDic[SeriesString][0]
+    def findSeriesXpath(self,SeriesString, cardtype, JPindex):
+        SearchStr = JPNameDic[SeriesString][JPindex]
         print("Series:",SeriesString ,"/SearchStr:", SearchStr)
         index=SeriesRadioBttnList.index(SearchStr)
         if(cardtype == "POKEMON"):
