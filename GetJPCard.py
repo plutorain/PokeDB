@@ -351,8 +351,17 @@ class JPCard(QThread):
         return link
 
     def StandardSeriesSlect(self, inputSeries, cardtype , JPindex):
-        self.SeriesOptionSpan = self.driver.find_element_by_xpath("//*[@id=\"CardSearchForm\"]/div/div[3]/div/div/div[4]/div[2]/div[2]")
-        self.SeriesOptionSpan.click()
+
+        while True:
+            try:
+                if(cardtype == "POKEMON"):
+                    self.SeriesOptionSpan = self.driver.find_element_by_xpath("//*[@id=\"CardSearchForm\"]/div/div[3]/div/div/div[4]/div[2]/div[2]")
+                elif(cardtype == "TRAINERS" or cardtype == "ENERGY"):
+                    self.SeriesOptionSpan = self.driver.find_element_by_xpath("//*[@id=\"CardSearchForm\"]/div/div[3]/div/div/div[2]/div[2]/div[2]")
+                self.SeriesOptionSpan.click()
+                break
+            except:
+                print("QThread Series OptionSpan click fail > Restart!! get element")
         while True:
             if(self.SeriesOptionSpan.get_attribute("class")=="groupSubList groupSubList-toggle js-open"):
                 print("QThread SeriesSpan OK:", self.SeriesOptionSpan.get_attribute("class"))
@@ -441,7 +450,7 @@ class JPCard(QThread):
         index=SeriesRadioBttnList.index(SearchStr)
         if(cardtype == "POKEMON"):
             return "//*[@id=\"CardSearchForm\"]/div/div[3]/div/div/div[4]/div[2]/div[2]/div[2]/div/ul/li["+str(index+2)+"]/label"
-        elif(cardtype == "TRAINERS"): 
+        elif(cardtype == "TRAINERS" or cardtype == "ENERGY"): 
             return "//*[@id=\"CardSearchForm\"]/div/div[3]/div/div/div[2]/div[2]/div[2]/div[2]/div/ul/li["+str(index+2)+"]/label"
         return 0
 
