@@ -9,7 +9,7 @@ from PyQt5 import uic
 from PyQt5.QtGui import *
 from PyQt5.QtCore import Qt, QSize, QEvent, QThread
 form_class = uic.loadUiType("PokeDBWindow.ui")[0]
-from PyQt5.QtCore import pyqtBoundSignal
+#from PyQt5.QtCore import pyqtBoundSignal
 
 #WEB BROWSER
 import webbrowser
@@ -25,6 +25,10 @@ import Poke_Card
 #import Get_Card_info_JP
 import GetJPCard
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
+
+from pandas import read_excel
+from pandas import DataFrame
+from pandas import concat
 
 
 try:
@@ -82,19 +86,77 @@ class PokeScore():
         #self.data[0][]
         print("clacscore")
 
+
+class EXCEL_DATA:
+    def __init__(self, f_name):
+        print("JP_DATA INIT")
+        try:
+            self.xlsx = read_excel(f_name, encoding='utf-8', keep_default_na=False) #read dataframe
+            self.key = self.xlsx.keys()
+            print(self.key)
+        except:
+            print("EXCEL DATA LOAD FAIL!!")
+            return None
+    
+    def XLS_DATA( self , col , row ):
+        return self.xlsx[self.key[col]][row]
+
+    def GetNonRedundantData(self, CompareData, fieldSeperator=False):
+        ExlDataDf=DataFrame(self.xlsx[self.key[0]])
+        if(fieldSeperator == True): #remove fieldSeperator("") to compare
+            CopareDf = DataFrame( {self.key[0]: [ str(CompareData[i][0])[1:-1] for i in range(len(CompareData)) ]} )
+        else:
+            CopareDf = DataFrame( {self.key[0]: [ str(CompareData[i][0]) for i in range(len(CompareData)) ]} )
+        
+        #First Column of DataBase + FindTag(index-0) +First Column of Excel File 
+        #Use Drop duplicates Delete duplicated rows
+        df_diff = concat([ExlDataDf, DataFrame(["FIND_TAG"], columns=[self.key[0]]) ,CopareDf]).drop_duplicates(keep=False)
+        
+        #print(df_diff)
+        res = None
+
+        #Find Tag Position To seperate Original Data from Where (Excel or DataBase)
+        tag_pos = 0
+        for i in range(len(df_diff.index)):
+            print(df_diff.iloc[i][0])
+            if(df_diff.iloc[i][0] == "FIND_TAG"):
+                tag_pos = i
+                break
+        print("TAG_POS : ",tag_pos)
+        if(tag_pos == 0): #DB data = Excel Data or DB has more data
+            idx_list = df_diff.index.to_list()
+            FullCompareDF = DataFrame( CompareData ,  columns = self.key, dtype=str ) 
+            print("---DataBase ORG Data--")
+            res = DataFrame(FullCompareDF, index=idx_list[1:], dtype=str)
+            print(res)
+            res = DataFrame([])
+        else: # DB data != Excel Data Seperate Data
+            ExlDataOrgIndex = df_diff.index[:tag_pos]
+            #print(ExlDataOrgIndex)
+            CompDataOrgIndex = df_diff.index[tag_pos+1:]
+            #print(CompDataOrgIndex)
+            res1 = DataFrame(self.xlsx, index=ExlDataOrgIndex, dtype=str)
+            print("---Excel ORG Data--")
+            print(res1[self.key[0]])
+            FullCompareDF = DataFrame( CompareData ,  columns = self.key, dtype=str ) 
+            res2 = DataFrame(FullCompareDF, index=CompDataOrgIndex, dtype=str)
+            print("---DataBase ORG Data--")
+            print(res2)
+            res = res1
+        return res.values.tolist()
+
+    def PrintExcelFile(self):
+        print(self.xlsx)
         
 class PokeDBWindow(QMainWindow, form_class):
     
     request_url = pyqtSignal(list)
     firstsig = pyqtSignal(list)
     sig_killbrowser = pyqtSignal(bool)
-    
 
     def __init__(self):
         super().__init__()
-        self.setupUi(self)
-        
-        
+        self.setupUi(self)        
         
         #DataBase
         self.conn = None
@@ -104,11 +166,7 @@ class PokeDBWindow(QMainWindow, form_class):
         self.col_cnt = 10
         self.col_list = []
         
-
         #QTable
-        #QTable Initial Size
-        #self.tableWidget.setColumnCount(10)
-        #self.tableWidget.setRowCount(10)
         self.initQTableAction()
         #Table Action Connect
         self.actionCell_Marking.triggered.connect(self.QTableCellMarking)
@@ -120,7 +178,6 @@ class PokeDBWindow(QMainWindow, form_class):
         self.tableUpdateList = []
 
         
-        
         self.max_cnt = 0
         #self.tableWidget.setItemDelegate(HTMLDelegate(self.tableWidget))
 
@@ -131,10 +188,9 @@ class PokeDBWindow(QMainWindow, form_class):
         self.menuList = []
         self.menuActionList = []
         
-
-        
         #DB Action Connect
         self.actionSelect_Table.triggered.connect(lambda:self.DBTableSelect(Select=True))
+        self.actionLoad_Table_For_Update.triggered.connect(self.DBUpdateFromExcel)
 
         #ALL Menu item Enable Init
         self.QMenuEnableALL(self.menuTable ,False)
@@ -163,12 +219,10 @@ class PokeDBWindow(QMainWindow, form_class):
         self.textBrowser.setEnabled(False)
         self.textBrowser.setReadOnly(True)
 
-
         #JP Card Search
         self.jpCard = None
         self.jpCardWindow = Poke_Card.MyWindow()
         self.jpCardWindow.SetCountry("JPN")
-        #self.jpCardWindow.ProgressBar.setValue
         self.jpCardWindow.setWindowTitle("JP Card Viewer")
         self.jpCardWindow.setWindowIcon(QIcon("Pokemon.ico"))
         self.BrowserRunning = False
@@ -186,9 +240,7 @@ class PokeDBWindow(QMainWindow, form_class):
 
     
     def initQTableAction(self):
-        
         #Table Right Button Menu
-
         #Delete all Actions
         for action in self.tableWidget.actions():
             action.deleteLater()
@@ -205,7 +257,7 @@ class PokeDBWindow(QMainWindow, form_class):
         
         #ADD Row Action (Common)
         add_action = QAction("ADD Row", self.tableWidget)
-        add_action.triggered.connect(self.QTableAddRow)
+        add_action.triggered.connect(lambda:self.QTableAddRow(1))
         self.tableWidget.addAction(add_action)
 
         #Update to DB Action (Common)
@@ -213,7 +265,7 @@ class PokeDBWindow(QMainWindow, form_class):
         update_action.triggered.connect(self.QTableUpdateDataBase)
         self.tableWidget.addAction(update_action)
 
-        
+        #Only Cardinfo table Use below Action
         if(self.DBTableNow == 'cardinfo'):
             url_action = QAction("Open Current Row Card Page", self.tableWidget)
             kr_action = QAction("Show Current Row Korea Card", self.tableWidget)
@@ -239,52 +291,87 @@ class PokeDBWindow(QMainWindow, form_class):
         #Table Column Label Right Button Menu
         col_header = self.tableWidget.horizontalHeader()
         col_header.setContextMenuPolicy(Qt.ActionsContextMenu)
-        self.colcopyAction  = QAction("Copy Selected Column", col_header)
-        abilityshow_all     = QAction("Show ALL Column", col_header)
+        
         if(self.DBTableNow == 'cardinfo'):
             abilityshow_action  = QAction("Hide ALL Column Except Ability", col_header) 
             abilitylabel_action = QAction("Hide ALL Column Except Ability_Label", col_header) 
+            
             col_header.addAction(abilityshow_action)
             col_header.addAction(abilitylabel_action)
+            
             select_list = ["ability1", "ability2", "ability3", "ability4"]
             abilityshow_action.triggered.connect(lambda:self.QTableShowOnlySelected(select_list))
             select_list2 = ["ability_label1", "ability_label2", "ability_label3", "ability_label4"]
             abilitylabel_action.triggered.connect(lambda:self.QTableShowOnlySelected(select_list2))
         
+        self.colcopyAction  = QAction("Copy Selected Column", col_header)
+        colShowAll          = QAction("Show ALL Column", col_header)
         col_header.addAction(self.colcopyAction)
-        col_header.addAction(abilityshow_all) 
-        
-        abilityshow_all.triggered.connect(self.QTableShowALLCol)
-        
+        col_header.addAction(colShowAll) 
         self.colcopyAction.triggered.connect(self.copySelection)
+        colShowAll.triggered.connect(self.QTableShowALLCol)
+        
+    
+        #Table Raw Label Right Button Menu
+        row_header = self.tableWidget.verticalHeader()
+        row_header.setContextMenuPolicy(Qt.ActionsContextMenu)
+        self.rowcopyAction  = QAction("Copy Selected Column", row_header)
+        self.rowUpdateDbAction = QAction("Update Selected Row to DataBase")
+        row_header.addAction(self.colcopyAction)
+        row_header.addAction(self.rowUpdateDbAction)
+        self.rowUpdateDbAction.triggered.connect(self.QTableSelRowUpdateDB)
         
         
         #Variable Action by QtableSelectionChanged
         self.HideColumnAction = QAction("Hide Selected Column", self.tableWidget)
         self.ShowColumnAction = QAction("Show Selected Column", self.tableWidget)
-        self.HideColumnAction.triggered.connect(self.QTableHideSelected)#Prevent error first disconncet
-        self.ShowColumnAction.triggered.connect(self.QTableShowSelected)#Prevent error first disconncet
-
-        #for ADD Row function
-        self.tableAddList = []
         
     def onSectionClicked(self):
         print("section clicked")
     
-    def QTableAddRow(self):
-        print("QTableAddRow")
-        rowcnt=self.tableWidget.rowCount()
-        #self.tableWidget.setRowCount(rowcnt+1)
-        self.tableWidget.insertRow(rowcnt)
-        self.tableWidget.setCurrentCell(rowcnt, 0)
-        self.tableAddList.append(rowcnt)
-        print("AddedList : ", self.tableAddList)
-        #self.tableWidget.scrollToItem(self.tableWidget.item(rowcnt,0), QAbstractItemView.PositionAtCenter)
+    def QTableAddRow(self, cnt=1):
+        print("AddRow : %d row"%cnt)
+        for i in range(cnt):
+            #print("QTableAddRow : %d"%(i+1))
+            rowcnt=self.tableWidget.rowCount()
+            #self.tableWidget.setRowCount(rowcnt+1)
+            self.tableWidget.insertRow(rowcnt)
+            self.tableWidget.setCurrentCell(rowcnt, 0)
+            self.tableAddList.append(rowcnt)
+            #print("AddedList : ", self.tableAddList)
+            #self.tableWidget.scrollToItem(self.tableWidget.item(rowcnt,0), QAbstractItemView.PositionAtCenter)
+        print("Added Row Update to List Finish!!")
 
-    def QTableUpdateDataBase(self):
+    def QTableSelRowUpdateDB(self):
         print("QTableUpdateDataBase")
+        rangelist = self.tableWidget.selectedRanges()
+
+        selectedRowList = []
+        for now_range in rangelist: #QTableWidgetSelectionRange Loop 
+            if (now_range.columnCount() == self.tableWidget.columnCount()): #row Selected
+                #print("Bottom:", now_range.bottomRow() ,"Top:", now_range.topRow())
+                for i in range(now_range.topRow(), now_range.bottomRow()+1): selectedRowList.append(i) 
+
+        print("Slected Rows",selectedRowList)
+        print()
+
+        for row in selectedRowList:
+            self.QTableUpdateDataBase(row, disableMessage=True)
+        
+        self.MessageBox("Upate Finish!!!\nSelected Rows")
+
+  
+        
+
+    def QTableUpdateDataBase(self, row=-1 , disableMessage=False):
+        print("QTableUpdateDataBase")
+        print("row : ", row)
         sql = 'INSERT INTO `pokecard`.`%s` ('%self.DBTableNow
-        currentRow = self.tableWidget.currentRow()
+        if(row == False):
+            currentRow = self.tableWidget.currentRow()
+        else:
+            currentRow =row
+        print("CurrentRow : %d , AddedList :"%(currentRow),self.tableAddList )
         try:
             self.tableAddList.index(currentRow)
             isAdd = True
@@ -319,13 +406,16 @@ class PokeDBWindow(QMainWindow, form_class):
             if(self.tableWidget.item(currentRow, index) == None):
                 sql+='"",'
             else:
-                sql+='"%s",'%self.tableWidget.item(currentRow, index).text()
+                if(self.DBTableNow == 'cardinfo'):
+                    sql+='"""%s""",'%self.tableWidget.item(currentRow, index).text()
+                else:
+                    sql+='"%s",'%self.tableWidget.item(currentRow, index).text()
                 log.append(self.tableWidget.item(currentRow, index).text())
         sql = sql[:-1] + ")"
         print(sql)
         #INSERT EX)INSERT INTO `pokecard`.`name` (`JP`, `KOR`) VALUES ('aaaa', 'bbb') LIMIT 1;
         self.textBrowser.append("NEW ROW :%s\n"%(log))
-        self.DB_UpdateQuery(sql)
+        self.DB_UpdateQuery(sql , disableMessage)
         self.tableAddList.remove(currentRow)
         print("DB ADD Finish!!!")
         
@@ -459,10 +549,12 @@ class PokeDBWindow(QMainWindow, form_class):
         if(self.searchCount == 0):
             print("default search Mode")
             txt, ok = QInputDialog.getText(self, 'InputWindow', 'Search Text')
-            if ok:
+            if ok and txt!=None:
                 self.searchCountBox.setValue(1)
                 self.treelist[0].setText(2, txt)
                 self.QMenuCheckAll(0, Qt.Checked)
+            else:
+                return False
                 
             #return False
         #Check EmptyText
@@ -539,6 +631,32 @@ class PokeDBWindow(QMainWindow, form_class):
         except mysql.connector.Error as err:
             print(err)
 
+    def DBUpdateFromExcel(self):
+        print ("LOAD_JP")
+        self.r_fileName = QFileDialog.getOpenFileName(self, self.tr("Open Data files"), ",/", self.tr("Data Files (*.csv *.xls *.xlsx);; All Files(*.*)"))
+        print(self.r_fileName[0])
+        if(self.r_fileName[0] == ""): #Cancel Select case
+            return False
+        self.r_data = EXCEL_DATA(self.r_fileName[0]) #Excel Load Fail Case
+        if(self.r_data == None):
+            self.MessageBox("Load Fail!!\nPlease check the file")
+            return False
+
+        sql = "SELECT * FROM `pokecard`.`%s`"%(self.DBTableNow) 
+        firstCol = self.DB_SendQuery(sql) # Return List[Tuple()]
+        
+        #print(firstCol)
+        Seperator = False
+        if(self.DBTableNow == "cardinfo"):
+            Seperator = True
+        res=self.r_data.GetNonRedundantData(firstCol, fieldSeperator=Seperator)
+
+        self.QTableAddRow(cnt=len(res))
+        self.QTableUpdateList(res, ClearList=False, DeleteSeperator=False)
+        self.tabWidget.setCurrentIndex(1)
+
+        
+
     def DBGetTableList(self):
         sql = 'SELECT * FROM `information_schema`.`TABLES` WHERE TABLE_SCHEMA = "pokecard"'
         resultList=self.DB_SendQuery(sql)
@@ -560,10 +678,13 @@ class PokeDBWindow(QMainWindow, form_class):
             self.QMenuEnableALL(self.menuTable ,True)
             self.QMenuEnableALL(self.menuSearch ,True)
             self.actionConnect_To_DataBase.setEnabled(False)
+            self.actionLoad_Table_For_Update.setEnabled(True)
             self.actionSelect_Table.setEnabled(True)
             self.textBrowser.setEnabled(True)
+            
             print("Connect OK")
             self.MessageBox("Connected!!!")
+        #DB Select Case AddList Initialize
         self.tableAddList = []
         self.tableUpdateList = []
         
@@ -721,9 +842,34 @@ class PokeDBWindow(QMainWindow, form_class):
     def QTableItemSelectionChanged(self):
         range_t = self.tableWidget.selectedRanges()
         #print(range_t)
+        #print(range_t[0].rowCount(), range_t[0].columnCount())
         if(range_t == []):
             return False
-        if(range_t[0].rowCount() == self.tableWidget.rowCount()): # column selected
+        RowCnt = range_t[0].rowCount()
+        ColCnt = range_t[0].columnCount()
+        
+        if(RowCnt < self.tableWidget.rowCount() and ColCnt < self.tableWidget.columnCount()): #select item
+            if(self.HideColumnAction in self.tableWidget.horizontalHeader().actions()):
+                self.tableWidget.horizontalHeader().removeAction(self.HideColumnAction)
+                self.tableWidget.horizontalHeader().removeAction(self.ShowColumnAction)
+            if(self.rowUpdateDbAction in self.tableWidget.verticalHeader().actions()):
+                self.tableWidget.verticalHeader().removeAction(self.rowUpdateDbAction)
+            #Chnage Ctrl+C Action (Column -> item)
+            self.copy_action.setShortcut('Ctrl+C')
+            self.rowcopyAction.setShortcut(QKeySequence())
+            self.colcopyAction.setShortcut(QKeySequence())
+        elif(RowCnt == self.tableWidget.rowCount() and ColCnt == self.tableWidget.columnCount()): #select ALL
+            if(self.HideColumnAction in self.tableWidget.horizontalHeader().actions()):
+                self.tableWidget.horizontalHeader().removeAction(self.HideColumnAction)
+                self.tableWidget.horizontalHeader().removeAction(self.ShowColumnAction)
+            if(self.rowUpdateDbAction in self.tableWidget.verticalHeader().actions()):
+                self.tableWidget.verticalHeader().removeAction(self.rowUpdateDbAction)
+            self.copy_action.setShortcut(QKeySequence())
+            self.rowcopyAction.setShortcut(QKeySequence())
+            self.colcopyAction.setShortcut(QKeySequence())
+        elif(RowCnt == self.tableWidget.rowCount()): # column selected
+            if(self.rowUpdateDbAction in self.tableWidget.verticalHeader().actions()):
+                self.tableWidget.verticalHeader().removeAction(self.rowUpdateDbAction)
             left = range_t[0].leftColumn()
             Right = range_t[0].rightColumn()
             self.tableWidget.horizontalHeader().addAction(self.HideColumnAction)
@@ -731,20 +877,22 @@ class PokeDBWindow(QMainWindow, form_class):
             select = []
             for i in range(left, Right+1):
                 select.append(self.col_list[i])
-            self.HideColumnAction.triggered.disconnect()
-            self.ShowColumnAction.triggered.disconnect()
+            receiversCount = self.HideColumnAction.receivers(self.HideColumnAction.triggered)
+            if(receiversCount > 0):
+                self.HideColumnAction.triggered.disconnect()
+                self.ShowColumnAction.triggered.disconnect()
             self.HideColumnAction.triggered.connect(lambda: self.QTableHideSelected(select))
             self.ShowColumnAction.triggered.connect(lambda: self.QTableShowSelected(select))
-            #Chnage Ctrl+C Action
             self.copy_action.setShortcut(QKeySequence())
+            self.rowcopyAction.setShortcut(QKeySequence())
             self.colcopyAction.setShortcut('Ctrl+C')
-
-        else:
-            self.tableWidget.horizontalHeader().removeAction(self.HideColumnAction)
-            self.tableWidget.horizontalHeader().removeAction(self.ShowColumnAction)
-            #Chnage Ctrl+C Action
-            self.copy_action.setShortcut('Ctrl+C')
+        elif(ColCnt == self.tableWidget.columnCount()): # Row Selected
+            self.tableWidget.verticalHeader().addAction(self.rowUpdateDbAction)
+            self.copy_action.setShortcut(QKeySequence())
+            self.rowcopyAction.setShortcut('Ctrl+C')
             self.colcopyAction.setShortcut(QKeySequence())
+
+        
         
         
     def QTable_CellDoubleClicked(self):
@@ -956,31 +1104,31 @@ class PokeDBWindow(QMainWindow, form_class):
                 item.setForeground(QColor(0,0,0))
         self.QTableCellChangeSetEnable(True)
     
-    def QTableUpdateList(self,resultList):
+    def QTableUpdateList(self,resultList, UpdateEvent=False, ClearList=True, DeleteSeperator=True):
         self.max_cnt = len(resultList)
         self.tableWidget.setRowCount(self.max_cnt)        
-        self.QTableCellChangeSetEnable(False)
+        self.QTableCellChangeSetEnable(UpdateEvent)
         for row in range(self.max_cnt):
             for col in range(self.col_cnt):
-                if (self.DBTableNow == "cardinfo"):
+                #cardinfo data from Excelfile don't need to delete ""
+                if (self.DBTableNow == "cardinfo" and DeleteSeperator == True): 
                     self.tableWidget.setItem(row, col, QTableWidgetItem(resultList[row][col][1:-1]))
                 else:
                     self.tableWidget.setItem(row, col, QTableWidgetItem(resultList[row][col]))
-        self.QTableCellChangeSetEnable(True)
-        self.tableAddList = [] #Init Added List 
-        self.tableUpdateList = [] #Init Update List
+        self.QTableCellChangeSetEnable(not(UpdateEvent))
+        if(ClearList == True):
+            self.tableAddList = [] #Init Added List 
+            self.tableUpdateList = [] #Init Update List
     
     def QTableUpdateColumn(self):
         sql="SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='%s'"%self.DBTableNow
-        resultList=self.DB_SendQuery(sql) # tuple 이 들어있는 list
+        resultList=self.DB_SendQuery(sql) # return : list [ tuple() ] 
         self.col_cnt = len(resultList)
         self.col_list = []
         self.tableWidget.setColumnCount(self.col_cnt)        
         for i in range(self.col_cnt):
             self.tableWidget.setHorizontalHeaderItem(i, QTableWidgetItem(resultList[i][0]))
-            #self.tableWidget.sectionClicked(i).connect()
             self.col_list.append(resultList[i][0])
-        #self.tableWidget.setColumnCount(0)
         self.tableWidget.setRowCount(0)    
     
     def Search_Clicked(self):
@@ -1009,10 +1157,11 @@ class PokeDBWindow(QMainWindow, form_class):
             print(self.cursor.fetchall())
         '''
     
-    def DB_UpdateQuery(self, sql):
+    def DB_UpdateQuery(self, sql, disableMessage=False):
         self.cursor.execute(sql)
         self.conn.commit()
-        self.MessageBox("Update Finish!!")
+        if(disableMessage == False):
+            self.MessageBox("Update Finish!!")
 
     def MessageBox(self,msg):
         w = QWidget()
@@ -1023,11 +1172,8 @@ class PokeDBWindow(QMainWindow, form_class):
         Mbox.setTextInteractionFlags(Qt.TextSelectableByMouse)
         Mbox.setText(msg)
         w.move(self.pos().x()+(self.width()-w.width())/2,self.pos().y()+(self.height()-w.height())/2)
-        #w.setWindowIcon
-        #Mbox=QMessageBox(w)
         Mbox.exec()
-        #Mbox.move(self.pos().x()+(self.width()-Mbox.width())/2,self.pos().y()+(self.height()-Mbox.height())/2)
-        #Mbox.information(w, "Information", msg)
+
     
     def resizeEvent(self,event):
         h = self.height()
@@ -1035,15 +1181,7 @@ class PokeDBWindow(QMainWindow, form_class):
         self.tabWidget.resize(w-20,h-40)
         self.treeWidget.resize(w-26,h-80)
         self.tableWidget.resize(w-26,h-80) #Table Resize
-        self.textBrowser.resize(w-26,h-80) #Table Resize
-    
-    
-    #def keyPressEvent(self, ev):
-    #    print("keyPressEvent")
-    #    if(ev.key() == Qt.Key_C) and (ev.modifiers() & Qt.ControlModifier):
-    #        print( "Thread Info: %s, %s"%(QThread.currentThread() ,  QThread.currentThreadId()))
-    #        self.copySelection()
-        
+        self.textBrowser.resize(w-26,h-80) #Table Resize        
     
     def copySelection(self):
         print("copySelection!!!!")
@@ -1062,6 +1200,7 @@ class PokeDBWindow(QMainWindow, form_class):
             stream = io.StringIO()
             csv.writer(stream, delimiter='\t').writerows(table)
             cb = QApplication.clipboard()
+            #IMPORTANT!!! ToAcCess Clipboard Write From MainWindow 
             cb.clear(mode=cb.Clipboard )
             cb.setText(stream.getvalue(), mode=cb.Clipboard)
             #print("---------------Clipboard Data--------------")

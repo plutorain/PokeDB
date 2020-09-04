@@ -146,6 +146,7 @@
     </property>
     <addaction name="actionConnect_To_DataBase"/>
     <addaction name="actionSelect_Table"/>
+    <addaction name="actionLoad_Table_For_Update"/>
    </widget>
    <widget class="QMenu" name="menuSearch">
     <property name="enabled">
@@ -238,6 +239,14 @@
    </property>
    <property name="text">
     <string>Select Table</string>
+   </property>
+  </action>
+  <action name="actionLoad_Table_For_Update">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Load Table For Update</string>
    </property>
   </action>
  </widget>
