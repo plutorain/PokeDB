@@ -67,7 +67,7 @@
        <number>3</number>
       </property>
       <attribute name="headerVisible">
-       <bool>false</bool>
+       <bool>true</bool>
       </attribute>
       <attribute name="headerCascadingSectionResizes">
        <bool>true</bool>
