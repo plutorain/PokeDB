@@ -247,7 +247,7 @@ class JPCard(QThread):
                 linklist=self.SearchAgain(self.RequestMsg[0], self.RequestMsg[1], self.RequestMsg[2], self.RequestMsg[3])
                 self.sendlist.emit(linklist)
                 self.RequestURL = False
-            self.msleep(100)
+            self.msleep(100) #Warn! Need to use QThread msleep
 
 
     def UpdateProgress(self, update):

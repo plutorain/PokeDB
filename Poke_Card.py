@@ -51,7 +51,7 @@ class MyWindow(QMainWindow, form_class):
             self.ProgressBar=QProgressBar(self.widgetProgress)
             self.ProgressBar.setRange(0,100)
             self.ProgressBar.resize(395,31)
-            print("PokeCard Progress Bar(w:%d,h:%d)"%(self.ProgressBar.width(), self.ProgressBar.height()))
+            #print("PokeCard Progress Bar(w:%d,h:%d)"%(self.ProgressBar.width(), self.ProgressBar.height()))
             
 
         elif(Country == "KOR"):

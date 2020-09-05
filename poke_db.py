@@ -7,7 +7,7 @@ import sys
 from PyQt5.QtWidgets import *
 from PyQt5 import uic 
 from PyQt5.QtGui import *
-from PyQt5.QtCore import Qt, QSize, QEvent, QThread
+from PyQt5.QtCore import Qt, QSize, QEvent, QThread, QObject
 form_class = uic.loadUiType("PokeDBWindow.ui")[0]
 #from PyQt5.QtCore import pyqtBoundSignal
 
@@ -22,13 +22,15 @@ import csv
 import Poke_Card
 
 #JP Search
-#import Get_Card_info_JP
 import GetJPCard
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
-
 from pandas import read_excel
 from pandas import DataFrame
 from pandas import concat
+from PyQt5 import QtTest
+
+#PokeConverter
+import Pokecard_Converter
 
 
 try:
@@ -87,19 +89,45 @@ class PokeScore():
         print("clacscore")
 
 
-class EXCEL_DATA:
+class EXCEL_DATA(QThread):
+
+    NonRedundantList=pyqtSignal(list)
+
     def __init__(self, f_name):
         print("JP_DATA INIT")
         try:
-            self.xlsx = read_excel(f_name, encoding='utf-8', keep_default_na=False) #read dataframe
-            self.key = self.xlsx.keys()
-            print(self.key)
+            namelist=f_name.split('.')
+            
+            ext = namelist[len(namelist)-1].strip()
+            if(ext == 'xlsx' or ext == 'xlsm' or ext == 'xls' or ext == 'csv'):
+                pass
+            else:
+                print("EXCEL DATA LOAD FAIL!!")
+                return None
+            self.xlsx = None
+            self.key = None
+            self.f_name = f_name
+            #print(self.key)
+            QThread.__init__(self)
         except:
             print("EXCEL DATA LOAD FAIL!!")
             return None
     
     def XLS_DATA( self , col , row ):
         return self.xlsx[self.key[col]][row]
+
+    
+    def SetRedundantData(self, CompareData, fieldSeperator=False):
+        self.fieldSeperator = fieldSeperator
+        self.CompareData = CompareData
+    
+    def run(self):
+        #init just check file extension
+        self.xlsx = read_excel(self.f_name, encoding='utf-8', keep_default_na=False) #read dataframe
+        self.key = self.xlsx.keys()
+        res=self.GetNonRedundantData(self.CompareData, self.fieldSeperator)
+        self.NonRedundantList.emit(res)
+
 
     def GetNonRedundantData(self, CompareData, fieldSeperator=False):
         ExlDataDf=DataFrame(self.xlsx[self.key[0]])
@@ -147,12 +175,73 @@ class EXCEL_DATA:
 
     def PrintExcelFile(self):
         print(self.xlsx)
+
+
+class MyProgressBar(QProgressBar):
+    def __init__(self, widget):
+        super().__init__(widget)
+        self.setRange(0, 0)
+        self.setAlignment(Qt.AlignCenter)
+        self._text = None
+    def setText(self, text):
+        self._text = text
+    def text(self):
+        return self._text
+
+class QProgressPopup(QThread):
+    init = pyqtSignal(bool)
+    progress = pyqtSignal(int)
+    def __init__(self, min, max, hideTitle=False, pos = None, txt = None):
+        QThread.__init__(self)
+        self.w = QWidget()
+        QProgressBar.__init__(self.w)
+        self.ProgressBar = MyProgressBar(self.w)
+        self.cnt = 0
+        self.ProgressBar.setRange(min,max)
+        self.ProgressBar.resize(420,31)
+        self.w.resize(420,31)
+        self._status = False
+
+        if(hideTitle == True):
+            self.w.setWindowFlag(Qt.FramelessWindowHint)
+
+        if(txt):
+            self.ProgressBar.setText(txt)
+        if(pos):
+            print("move")
+            self.w.move( pos["x"]+(pos["width"]-self.w.width())/2 , pos["y"]+ (pos["height"]-self.w.height())/2 )
+        self.w.show()
+
+    def run(self):
+        self._status = True
+        while True:
+            self.msleep(100)
+            print("[QProgressThread] Running")
+            if(self.ProgressBar.value == 100):
+                break
+        print("[QProgressThread] Finish")
+        self._status = False
+    
+    def closeEvent(self, event):
+        print("[QProgressThread]closeEvent!!!")
+        self.w.close()
+        self.terminate()
+
+            
+
         
 class PokeDBWindow(QMainWindow, form_class):
     
-    request_url = pyqtSignal(list)
-    firstsig = pyqtSignal(list)
-    sig_killbrowser = pyqtSignal(bool)
+    #JP Card Search Signal
+    request_url = pyqtSignal(list) #Request URL Again (Browser Already Opened)
+    firstsig = pyqtSignal(list) #Browser Open, Request URL
+    sig_killbrowser = pyqtSignal(bool) #kill Browser
+
+    #ProgWindow Close Signal
+    ProgCloseSig=pyqtSignal(QEvent)
+
+    #Converter Signal
+    ConvertMsg=pyqtSignal(list)
 
     def __init__(self):
         super().__init__()
@@ -191,6 +280,7 @@ class PokeDBWindow(QMainWindow, form_class):
         #DB Action Connect
         self.actionSelect_Table.triggered.connect(lambda:self.DBTableSelect(Select=True))
         self.actionLoad_Table_For_Update.triggered.connect(self.DBUpdateFromExcel)
+        self.RedundantList = None #List Get From Thread
 
         #ALL Menu item Enable Init
         self.QMenuEnableALL(self.menuTable ,False)
@@ -213,6 +303,17 @@ class PokeDBWindow(QMainWindow, form_class):
         self.CardWindow.SetCountry("KOR")
         self.CardWindow.setWindowTitle("PokeCard Viewer")
         self.CardWindow.setWindowIcon(QIcon("Pokemon.ico"))
+
+        #Converter Tab
+        self.pushButton_Load_JP.clicked.connect(self.Convert_Load_JP_Clicked)
+        self.pushButton_Cvt_KR.clicked.connect(self.Convert_KR_Clicked)
+        self.pushButton_Cvt_Txt.clicked.connect(self.Convert_Txt_Clicked)
+        self.pushButton_Cvt_KR.setEnabled(False)
+        self.pushButton_Cvt_Txt.setEnabled(False)
+        self.r_data = None #read data (JP Excel file)
+        self.w_data = None #write data (KR Excel file)
+        self.Converter  = None
+        self.isFinish = False
         
         #Log Text Viewr
         self.searchExeCnt = 0
@@ -226,17 +327,40 @@ class PokeDBWindow(QMainWindow, form_class):
         self.jpCardWindow.setWindowTitle("JP Card Viewer")
         self.jpCardWindow.setWindowIcon(QIcon("Pokemon.ico"))
         self.BrowserRunning = False
+
+        #ProgressBar
+        self.ProgWindow = None
+
+    
+    def QProgressStart(self, getText):
+        my_pos = {
+            "x"     : self.pos().x(),
+            "width" : self.width(), 
+            "y"     : self.pos().y(),
+            "height": self.height()
+        }
+        self.ProgWindow = QProgressPopup(0,0, hideTitle=True, pos=my_pos, txt=getText)
+        self.ProgCloseSig.connect(self.ProgWindow.closeEvent)
+    
+    def QProgressClose(self):
+        self.ProgWindow.terminate()
+        self.ProgCloseSig.emit(QEvent(QEvent.Close))
+
         
     
     def closeEvent(self, event):
         print("closeEvent!!!")
+        if(self.r_data != None):
+            self.ConvertMsg.emit(["FINISH"])
+            self.ConverterFinishCheck()
+            self.Converter.terminate()
+        
         if(self.BrowserRunning):
             #self.jpCard.closeBrowser()
             self.sig_killbrowser.emit(True)
             self.jpCard.terminate()
             self.jpCardWindow.close()
         self.CardWindow.close()
-        
 
     
     def initQTableAction(self):
@@ -353,7 +477,6 @@ class PokeDBWindow(QMainWindow, form_class):
                 for i in range(now_range.topRow(), now_range.bottomRow()+1): selectedRowList.append(i) 
 
         print("Slected Rows",selectedRowList)
-        print()
 
         for row in selectedRowList:
             self.QTableUpdateDataBase(row, disableMessage=True)
@@ -636,26 +759,44 @@ class PokeDBWindow(QMainWindow, form_class):
         self.r_fileName = QFileDialog.getOpenFileName(self, self.tr("Open Data files"), ",/", self.tr("Data Files (*.csv *.xls *.xlsx);; All Files(*.*)"))
         print(self.r_fileName[0])
         if(self.r_fileName[0] == ""): #Cancel Select case
+            self.MessageBox('Please Select Excel File Again')
             return False
+
+        self.QProgressStart("Now Loading...")
+
+        #TODO RUN THREAD
         self.r_data = EXCEL_DATA(self.r_fileName[0]) #Excel Load Fail Case
         if(self.r_data == None):
             self.MessageBox("Load Fail!!\nPlease check the file")
+            self.QProgressClose()
             return False
 
         sql = "SELECT * FROM `pokecard`.`%s`"%(self.DBTableNow) 
-        firstCol = self.DB_SendQuery(sql) # Return List[Tuple()]
+        DB_DATA = self.DB_SendQuery(sql) # Return List[Tuple()]
         
-        #print(firstCol)
         Seperator = False
         if(self.DBTableNow == "cardinfo"):
             Seperator = True
-        res=self.r_data.GetNonRedundantData(firstCol, fieldSeperator=Seperator)
+        #res=self.r_data.GetNonRedundantData(DB_DATA, fieldSeperator=Seperator)
+        self.r_data.SetRedundantData(DB_DATA, fieldSeperator=Seperator)
+        self.r_data.NonRedundantList.connect(self.DBGetRedundantList)
+        self.r_data.start()
+        #CHECK MSG FROM THREAD
+        while (self.RedundantList == None):
+            QtTest.QTest.qWait(100) #Wait 100ms
+
+        res = self.RedundantList
+        self.RedundantList = None
 
         self.QTableAddRow(cnt=len(res))
         self.QTableUpdateList(res, ClearList=False, DeleteSeperator=False)
+        self.ProgWindow.terminate()
+        self.ProgCloseSig.emit(QEvent(QEvent.Close))
         self.tabWidget.setCurrentIndex(1)
 
-        
+    @pyqtSlot(list)
+    def DBGetRedundantList(self, getlist):
+        self.RedundantList = getlist
 
     def DBGetTableList(self):
         sql = 'SELECT * FROM `information_schema`.`TABLES` WHERE TABLE_SCHEMA = "pokecard"'
@@ -891,24 +1032,6 @@ class PokeDBWindow(QMainWindow, form_class):
             self.copy_action.setShortcut(QKeySequence())
             self.rowcopyAction.setShortcut('Ctrl+C')
             self.colcopyAction.setShortcut(QKeySequence())
-
-        
-        
-        
-    def QTable_CellDoubleClicked(self):
-        if(self.tableWidget.currentItem() == None):
-            return False
-        if(self.tableWidget.horizontalHeaderItem(0).text() == "CardNum" and self.tableWidget.currentColumn() == 0):
-            if(self.tableWidget.currentItem() != None):
-                CardNum = self.tableWidget.currentItem().text()
-                if(CardNum != ""):
-                    print("Find CardNum!!! : %s "%CardNum)
-                    self.CardWindow.setInputText(CardNum)
-                    self.CardWindow.btn_clicked()                    
-                    self.CardWindow.show()
-                    self.CardWindow.activateWindow()
-                    
-                    #webbrowser.get(chrome_path).open('https://pokemoncard.co.kr/cards/detail/'+CardNum)
     
     def QTableShowCurrentRow(self):
         row=self.tableWidget.currentRow()
@@ -1142,26 +1265,70 @@ class PokeDBWindow(QMainWindow, form_class):
 
         sql=sql[:-3]
         self.QTableUpdateList(self.DB_SendQuery(sql))
-        
     
     def DB_SendQuery(self, sql):
         self.cursor.execute(sql)
         return self.cursor.fetchall()
-
-        '''
-        iterable = self.cursor.execute('SELECT * FROM accounts; SELECT * FROM profile', multi=True)
-        for item in iterable:
-            print(item.fetchall())
-
-        self.cursor.execute('SELECT * FROM profile')
-            print(self.cursor.fetchall())
-        '''
     
     def DB_UpdateQuery(self, sql, disableMessage=False):
         self.cursor.execute(sql)
         self.conn.commit()
         if(disableMessage == False):
             self.MessageBox("Update Finish!!")
+
+    
+    def ConverterFinishCheck(self):
+        while True:
+            QtTest.QTest.qWait(200)
+            if(self.isFinish == True):
+                break
+        self.isFinish = False
+        print("[MainWindow] Get Finish Msg!!")
+    
+    def Convert_Load_JP_Clicked(self):
+        print ("LOAD_JP")
+        self.r_fileName = QFileDialog.getOpenFileName(self, self.tr("Open Data files"), ",/", self.tr("Data Files (*.csv *.xls *.xlsx);; All Files(*.*)"))
+        print(self.r_fileName[0])
+        if(self.r_fileName[0]==""):
+            return False
+        
+        self.QProgressStart("Now Loading...")
+        self.Converter  = Pokecard_Converter.ConverterThread()
+        self.ConvertMsg.connect(self.Converter.ConvertMsgSlot) #Mainwindow -> Thread
+        self.Converter.isFinish.connect(self.ConvertGetMsg) #Thread -> Mainwindow
+        self.Converter.start()
+        self.ConvertMsg.emit(["LOAD", self.r_fileName[0]])
+        self.ConverterFinishCheck()
+        self.QProgressClose()
+        self.pushButton_Cvt_KR.setEnabled(True)
+        self.pushButton_Cvt_Txt.setEnabled(True)
+        print("[MainWindow] Load JP Finish!!")
+
+    
+    def Convert_KR_Clicked(self):
+        self.w_data = Pokecard_Converter.KR_DATA("KR_Excel_Data.xlsx")
+        self.QProgressStart("Converting Now...")
+        self.ConvertMsg.emit(["CVT_KR"])
+        self.ConverterFinishCheck()
+        self.QProgressClose()
+        print("[MainWindow] Convert KR Finish!!")
+        self.MessageBox("Please check KR_Excel_Data.xlsx")
+    
+    def Convert_Txt_Clicked(self):
+        self.QProgressStart("Converting Now...")
+        self.ConvertMsg.emit(["CVT_TXT"])
+        self.ConverterFinishCheck()
+        self.QProgressClose()
+        print("[MainWindow] Convert TXT Finish!!")
+        self.MessageBox("Please check Converted_Result.txt")
+    
+    @pyqtSlot(list)
+    def ConvertGetMsg(self, finishMsg):
+        print("[MainWindow] GET Finish Msg", finishMsg)
+        self.isFinish = finishMsg[0]
+        if(len(finishMsg)>1):
+            self.r_data = finishMsg[1]  #After Load get read data
+        
 
     def MessageBox(self,msg):
         w = QWidget()
@@ -1208,12 +1375,38 @@ class PokeDBWindow(QMainWindow, form_class):
             #print("--------------------END---------------------")
             
 
+class QSignalSender(QObject):
+    sigmain = pyqtSignal(int)
+    def __init__(self,name):
+        QObject.__init__(self) 
+        self.name = name #
+        self.alive = True
+    def ConnectSlot(self, slot):
+        self.sigmain.connect(slot)
+    
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     demoWindow = PokeDBWindow()
     demoWindow.setWindowTitle("PokeCard DataBase")
     demoWindow.setWindowIcon(QIcon('Pokemon.ico'))
     demoWindow.show() 
-    app.exec_()
+    # w = QProgressPopup(0,0, txt = "Now Loading")
+    # w.start()
+    # main = QSignalSender("MAIN")
+    # main.ConnectSlot(w.ProgressBar.setValue)
+    # cnt = 0
+
+    # while True:
+    #     #main.sigmain.emit(cnt)
+    #     QtTest.QTest.qWait(15)
+    #     print("MainLoop : ", cnt)
+    #     cnt+=1
+    #     if(cnt == 101):
+    #         w.terminate()
+    #         break
+
+
     
+    app.exec_()
     
