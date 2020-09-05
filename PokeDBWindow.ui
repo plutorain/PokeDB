@@ -115,6 +115,50 @@
     </widget>
     <widget class="QWidget" name="tab3">
      <attribute name="title">
+      <string>Converter</string>
+     </attribute>
+     <widget class="QPushButton" name="pushButton_Load_JP">
+      <property name="geometry">
+       <rect>
+        <x>50</x>
+        <y>80</y>
+        <width>171</width>
+        <height>71</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>LOAD JAPAN FILE</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="pushButton_Cvt_KR">
+      <property name="geometry">
+       <rect>
+        <x>240</x>
+        <y>40</y>
+        <width>171</width>
+        <height>71</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>CONVERT EXCEL KR</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="pushButton_Cvt_Txt">
+      <property name="geometry">
+       <rect>
+        <x>240</x>
+        <y>120</y>
+        <width>171</width>
+        <height>71</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>CONVERT TXT</string>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="tab4">
+     <attribute name="title">
       <string>Log</string>
      </attribute>
      <widget class="QTextBrowser" name="textBrowser">

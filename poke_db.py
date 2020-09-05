@@ -32,6 +32,11 @@ from PyQt5 import QtTest
 #PokeConverter
 import Pokecard_Converter
 
+#Reader 
+# from gtts import gTTS
+# from playsound import playsound
+# import os
+
 
 try:
     from html import escape
@@ -331,6 +336,9 @@ class PokeDBWindow(QMainWindow, form_class):
         #ProgressBar
         self.ProgWindow = None
 
+        #Text Reader
+        self.tts = None
+
     
     def QProgressStart(self, getText):
         my_pos = {
@@ -395,11 +403,13 @@ class PokeDBWindow(QMainWindow, form_class):
             kr_action = QAction("Show Current Row Korea Card", self.tableWidget)
             jp_action = QAction("Search Current Row Japan Card", self.tableWidget)
             findname_action = QAction("Search Current Row Japan Name", self.tableWidget)
+            #read_action = QAction("Read Current Row", self.tableWidget)
             
             self.tableWidget.addAction(url_action)
             self.tableWidget.addAction(kr_action)
             self.tableWidget.addAction(jp_action)
             self.tableWidget.addAction(findname_action)
+            #self.tableWidget.addAction(read_action)
             
             url_action.triggered.connect(self.QTableRowOpenUrl)
             url_action.setShortcut('Ctrl+O')
@@ -408,6 +418,8 @@ class PokeDBWindow(QMainWindow, form_class):
             jp_action.triggered.connect(self.QTableSearchJPCard2)
             jp_action.setShortcut('Ctrl+J')
             findname_action.triggered.connect(self.QTableSearchJPName)
+            """read_action.triggered.connect(self.QTableRowTTS)
+            read_action.setShortcut('Ctrl+R') """
         
         #Range Selection Event
         self.tableWidget.itemSelectionChanged.connect(self.QTableItemSelectionChanged)
@@ -484,7 +496,23 @@ class PokeDBWindow(QMainWindow, form_class):
         self.MessageBox("Upate Finish!!!\nSelected Rows")
 
   
+    """ def QTableRowTTS(self):
+        currentRow = self.tableWidget.currentRow()
+        currentCol = self.tableWidget.currentColumn()
+        #for index in range(self.col_cnt):
         
+        print(self.tableWidget.item(currentRow, currentCol).text())
+        self.speak(self.tableWidget.item(currentRow, currentCol).text())
+        print("END READ!!") """
+            
+
+    """ def speak(self, my_text):
+        f = open("temp.mp3", "wb+")
+        gTTS(text=my_text, lang='ko').write_to_fp(f)
+        f.seek(0)
+        f.close()
+        playsound("temp.mp3")
+        os.remove("temp.mp3") """
 
     def QTableUpdateDataBase(self, row=-1 , disableMessage=False):
         print("QTableUpdateDataBase")
