@@ -3,6 +3,7 @@
 from pandas import read_excel
 from pandas import ExcelWriter
 from pandas import DataFrame
+from pandas import concat
 #import os
 import enum
 
@@ -580,10 +581,14 @@ class KR_DATA:
         return text
         
     def Remove_null_Data (self, token, method, null_val = ""):
-        if(self.format[token][0] == "n/a"): 
-            self.format[token]=null_val
+        tmp = self.format[token][0]
+        if("n/a" in str(tmp)): 
+            self.format[token]=[null_val]
         else:
-            self.format[token]=method(self.format[token][0])
+            self.format[token]=[method(tmp)]
+
+        if(token == "WR_POKE_NO"):
+            print("Token:",token, type(token), "POKE_NO",tmp, type(tmp))
         
     
     def InputCardData(self, card):
@@ -716,7 +721,9 @@ class KR_DATA:
         #Make Data frame , Append to Excel File
         #df = pd.DataFrame( self.format )
         df = DataFrame( self.format )
-        self.append_df_to_excel(df , startcol = 2, index = False,  header = False)
+
+        return df
+        #self.append_df_to_excel(df , startcol = 2, index = False,  header = False)
 
         #df.to_excel(self.writer, sheet_name='Sheet1', startrow = 0, startcol = 2, index = False,  header = False)
         #df.to_excel(self.writer, sheet_name='Sheet1')
@@ -726,6 +733,84 @@ class KR_DATA:
         #self.writer.close()
         return 0
         
+    
+ 
+
+class ConverterThread(QThread):
+    
+    isFinish = pyqtSignal(list)
+
+    def __init__(self):
+        super().__init__()
+        self.finish = False
+        self.MsgSlot = None
+        self.r_fileName = None
+        self.r_data = 0 #read data (JP Excel file)
+        self.w_data = 0 #write data (KR Excel file)
+
+
+    @pyqtSlot(list)
+    def ConvertMsgSlot(self, Msg):
+        self.MsgSlot = Msg[0]
+        if(len(Msg) > 1): #Load Case
+            self.r_fileName = Msg[1]
+        
+
+    def run(self):
+        while True:
+            #print("[ConverterThread] Wait MSG")
+            if(self.MsgSlot == "LOAD"):
+                print("[ConverterThread] LOAD!!")
+                self.Load_JP()
+                self.isFinish.emit([True, self.r_data])
+                self.MsgSlot = None
+            elif(self.MsgSlot == "CVT_KR"):
+                print("[ConverterThread] CVT_KR")
+                self.Convert_KR()
+                self.MsgSlot = None
+                self.isFinish.emit([True])
+            elif(self.MsgSlot == "CVT_TXT"):
+                print("[ConverterThread] CVB_TXT")
+                self.Convert_Txt()
+                self.MsgSlot = None
+                self.isFinish.emit([True])
+            elif(self.MsgSlot == "FINISH"):
+                self.MsgSlot = None
+                self.isFinish.emit([True])
+                break
+            self.msleep(500)
+            
+        print("[ConverterThread] Thread Finish")
+        
+    
+    def Load_JP(self):
+        print ("[ConverterThread] LOAD_JP")
+        print(self.r_fileName)
+        self.r_data = JP_DATA(self.r_fileName)
+    
+    def Convert_KR(self):
+        print ("[ConverterThread] CONVERT_KR")
+        self.w_data = KR_DATA("KR_Excel_Data.xlsx")
+        self.file_name = "KR_Excel_Data.xlsx"
+        df = DataFrame()
+        while(True):
+            card = self.r_data.Get_Card_Data()
+            if(card == "EOF"):
+                break
+            print("NOW_CARD : %s" % card.CARD_NO[0])
+            df = concat([df, self.w_data.InputCardData(card)])
+        
+        self.append_df_to_excel(df , startcol = 2, index = False,  header = False)
+    
+    def Convert_Txt(self):
+        print ("[ConverterThread] CONVERT_TXT")
+        self.r_data.export_txt_files()
+        self.r_data.SetStartPos() #ready to convert again
+
+    def closeEvent(self, event):
+        print("[ConverterThread] closeEvent!!!")
+        self.terminate()
+    
     def append_df_to_excel(self, df, sheet_name='Sheet1', startrow=None,
                        truncate_sheet=False, 
                        **to_excel_kwargs):
@@ -791,78 +876,6 @@ class KR_DATA:
 
         # save the workbook
         writer.save()
- 
-
-class ConverterThread(QThread):
-    
-    isFinish = pyqtSignal(list)
-
-    def __init__(self):
-        super().__init__()
-        self.finish = False
-        self.MsgSlot = None
-        self.r_fileName = None
-        self.r_data = 0 #read data (JP Excel file)
-        self.w_data = 0 #write data (KR Excel file)
-
-
-    @pyqtSlot(list)
-    def ConvertMsgSlot(self, Msg):
-        self.MsgSlot = Msg[0]
-        if(len(Msg) > 1): #Load Case
-            self.r_fileName = Msg[1]
-        
-
-    def run(self):
-        while True:
-            #print("[ConverterThread] Wait MSG")
-            if(self.MsgSlot == "LOAD"):
-                print("[ConverterThread] LOAD!!")
-                self.Load_JP()
-                self.isFinish.emit([True, self.r_data])
-                self.MsgSlot = None
-            elif(self.MsgSlot == "CVT_KR"):
-                print("[ConverterThread] CVT_KR")
-                self.Convert_KR()
-                self.MsgSlot = None
-                self.isFinish.emit([True])
-            elif(self.MsgSlot == "CVT_TXT"):
-                print("[ConverterThread] CVB_TXT")
-                self.Convert_Txt()
-                self.MsgSlot = None
-                self.isFinish.emit([True])
-            elif(self.MsgSlot == "FINISH"):
-                self.MsgSlot = None
-                self.isFinish.emit([True])
-                break
-            self.msleep(500)
-            
-        print("[ConverterThread] Thread Finish")
-        
-    
-    def Load_JP(self):
-        print ("[ConverterThread] LOAD_JP")
-        print(self.r_fileName)
-        self.r_data = JP_DATA(self.r_fileName)
-    
-    def Convert_KR(self):
-        print ("[ConverterThread] CONVERT_KR")
-        self.w_data = KR_DATA("KR_Excel_Data.xlsx")
-        while(True):
-            card = self.r_data.Get_Card_Data()
-            if(card == "EOF"):
-                break
-            print("NOW_CARD : %s" % card.CARD_NO[0])
-            self.w_data.InputCardData(card)
-    
-    def Convert_Txt(self):
-        print ("[ConverterThread] CONVERT_TXT")
-        self.r_data.export_txt_files()
-        self.r_data.SetStartPos() #ready to convert again
-
-    def closeEvent(self, event):
-        print("[ConverterThread] closeEvent!!!")
-        self.terminate()
 
 
 

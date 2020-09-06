@@ -50,7 +50,6 @@ except ImportError:
 chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s'
 HIDE_BROWSER = True
 
-
 #DB 접속정보를 dict type 으로 준비한다.
 config={
         "user":"root",
