@@ -129,8 +129,14 @@ class EXCEL_DATA(QThread):
         #init just check file extension
         self.xlsx = read_excel(self.f_name, encoding='utf-8', keep_default_na=False) #read dataframe
         self.key = self.xlsx.keys()
-        res=self.GetNonRedundantData(self.CompareData, self.fieldSeperator)
-        self.NonRedundantList.emit(res)
+
+        print("[EXCEL QThread] DB Column size:",len(self.CompareData[0]), "Excel Column Size:", len(self.key))
+
+        if(len(self.CompareData[0]) != len(self.key)):
+            self.NonRedundantList.emit(["WRONG_FILE"])
+        else:
+            res=self.GetNonRedundantData(self.CompareData, self.fieldSeperator)
+            self.NonRedundantList.emit(res)
 
 
     def GetNonRedundantData(self, CompareData, fieldSeperator=False):
@@ -285,6 +291,7 @@ class PokeDBWindow(QMainWindow, form_class):
         self.actionSelect_Table.triggered.connect(lambda:self.DBTableSelect(Select=True))
         self.actionLoad_Table_For_Update.triggered.connect(self.DBUpdateFromExcel)
         self.RedundantList = None #List Get From Thread
+        self.r_data = None
 
         #ALL Menu item Enable Init
         self.QMenuEnableALL(self.menuTable ,False)
@@ -314,12 +321,12 @@ class PokeDBWindow(QMainWindow, form_class):
         self.pushButton_Cvt_Txt.clicked.connect(self.Convert_Txt_Clicked)
         self.pushButton_Cvt_KR.setEnabled(False)
         self.pushButton_Cvt_Txt.setEnabled(False)
-        self.r_data = None #read data (JP Excel file)
-        self.w_data = None #write data (KR Excel file)
+        self.r_JPfileName = None #read data (JP Excel file)
         self.Converter  = None
         self.isFinish = False
+        self.r_JPdata = None #Get JP_DATA()
         
-        #Log Text Viewr
+        #Log Text Viewer
         self.searchExeCnt = 0
         self.textBrowser.setEnabled(False)
         self.textBrowser.setReadOnly(True)
@@ -337,6 +344,8 @@ class PokeDBWindow(QMainWindow, form_class):
 
         #Text Reader
         self.tts = None
+
+        
 
     
     def QProgressStart(self, getText):
@@ -356,18 +365,25 @@ class PokeDBWindow(QMainWindow, form_class):
         
     
     def closeEvent(self, event):
-        print("closeEvent!!!")
+        print("[MainWindow]closeEvent!!!")
+        
+        #DB Update Load table
         if(self.r_data != None):
+            self.r_data.terminate()
+            print("[MainWindow]DB Update Close Finish!!!")
+        #Converter 
+        if(self.r_JPfileName != None):
             self.ConvertMsg.emit(["FINISH"])
             self.ConverterFinishCheck()
             self.Converter.terminate()
-        
+            print("[MainWindow]Converter Close Finish!!!")
         if(self.BrowserRunning):
             #self.jpCard.closeBrowser()
             self.sig_killbrowser.emit(True)
             self.jpCard.terminate()
             self.jpCardWindow.close()
         self.CardWindow.close()
+        print("[MainWindow]Browser Close Finish!!!")
 
     
     def initQTableAction(self):
@@ -811,15 +827,24 @@ class PokeDBWindow(QMainWindow, form_class):
         #CHECK MSG FROM THREAD
         while (self.RedundantList == None):
             QtTest.QTest.qWait(100) #Wait 100ms
-
+        
         res = self.RedundantList
         self.RedundantList = None
 
-        self.QTableAddRow(cnt=len(res))
-        self.QTableUpdateList(res, ClearList=False, DeleteSeperator=False)
+        if(res[0] == "WRONG_FILE"):
+            #LIST FAIL
+            self.MessageBox("Column Size is not Matched to DataBase!!!")
+        else:
+            #LIST OK
+            self.QTableAddRow(cnt=len(res))
+            self.QTableUpdateList(res, ClearList=False, DeleteSeperator=False)
+            self.tabWidget.setCurrentIndex(1)
+        
         self.ProgWindow.terminate()
         self.ProgCloseSig.emit(QEvent(QEvent.Close))
-        self.tabWidget.setCurrentIndex(1)
+        
+        self.r_data.terminate()
+        self.r_data = None
 
     @pyqtSlot(list)
     def DBGetRedundantList(self, getlist):
@@ -1023,18 +1048,17 @@ class PokeDBWindow(QMainWindow, form_class):
             if(self.rowUpdateDbAction in self.tableWidget.verticalHeader().actions()):
                 self.tableWidget.verticalHeader().removeAction(self.rowUpdateDbAction)
             #Chnage Ctrl+C Action (Column -> item)
+            self.QTableCopyActionShortCutInit()
             self.copy_action.setShortcut('Ctrl+C')
-            self.rowcopyAction.setShortcut(QKeySequence())
-            self.colcopyAction.setShortcut(QKeySequence())
         elif(RowCnt == self.tableWidget.rowCount() and ColCnt == self.tableWidget.columnCount()): #select ALL
             if(self.HideColumnAction in self.tableWidget.horizontalHeader().actions()):
                 self.tableWidget.horizontalHeader().removeAction(self.HideColumnAction)
                 self.tableWidget.horizontalHeader().removeAction(self.ShowColumnAction)
-            if(self.rowUpdateDbAction in self.tableWidget.verticalHeader().actions()):
+            if(self.rowUpdateDbAction in self.tableWidget.verticalHeader().actions() ):
                 self.tableWidget.verticalHeader().removeAction(self.rowUpdateDbAction)
-            self.copy_action.setShortcut(QKeySequence())
-            self.rowcopyAction.setShortcut(QKeySequence())
-            self.colcopyAction.setShortcut(QKeySequence())
+            if(self.tableWidget.rowCount() == 1): #RowCount 1EA Case
+                self.tableWidget.verticalHeader().addAction(self.rowUpdateDbAction)
+            self.QTableCopyActionShortCutInit()
         elif(RowCnt == self.tableWidget.rowCount()): # column selected
             if(self.rowUpdateDbAction in self.tableWidget.verticalHeader().actions()):
                 self.tableWidget.verticalHeader().removeAction(self.rowUpdateDbAction)
@@ -1051,14 +1075,18 @@ class PokeDBWindow(QMainWindow, form_class):
                 self.ShowColumnAction.triggered.disconnect()
             self.HideColumnAction.triggered.connect(lambda: self.QTableHideSelected(select))
             self.ShowColumnAction.triggered.connect(lambda: self.QTableShowSelected(select))
-            self.copy_action.setShortcut(QKeySequence())
-            self.rowcopyAction.setShortcut(QKeySequence())
+            self.QTableCopyActionShortCutInit()
             self.colcopyAction.setShortcut('Ctrl+C')
         elif(ColCnt == self.tableWidget.columnCount()): # Row Selected
             self.tableWidget.verticalHeader().addAction(self.rowUpdateDbAction)
-            self.copy_action.setShortcut(QKeySequence())
+            self.QTableCopyActionShortCutInit()
             self.rowcopyAction.setShortcut('Ctrl+C')
-            self.colcopyAction.setShortcut(QKeySequence())
+            
+
+    def QTableCopyActionShortCutInit(self):
+        self.copy_action.setShortcut(QKeySequence())
+        self.rowcopyAction.setShortcut(QKeySequence())
+        self.colcopyAction.setShortcut(QKeySequence())
     
     def QTableShowCurrentRow(self):
         row=self.tableWidget.currentRow()
@@ -1309,52 +1337,62 @@ class PokeDBWindow(QMainWindow, form_class):
             QtTest.QTest.qWait(200)
             if(self.isFinish == True):
                 break
+        
         self.isFinish = False
+        if(self.r_JPdata == None):
+            return False
+            print("[MainWindow] Get Load Fail Msg!!")
         print("[MainWindow] Get Finish Msg!!")
+        return True
     
     def Convert_Load_JP_Clicked(self):
         print ("LOAD_JP")
-        self.r_fileName = QFileDialog.getOpenFileName(self, self.tr("Open Data files"), ",/", self.tr("Data Files (*.csv *.xls *.xlsx);; All Files(*.*)"))
-        print(self.r_fileName[0])
-        if(self.r_fileName[0]==""):
+        self.r_JPfileName = QFileDialog.getOpenFileName(self, self.tr("Open Data files"), ",/", self.tr("Data Files (*.csv *.xls *.xlsx);; All Files(*.*)"))
+        print(self.r_JPfileName[0])
+        if(self.r_JPfileName[0]==""):
             return False
         
-        self.QProgressStart("Now Loading...")
         self.Converter  = Pokecard_Converter.ConverterThread()
         self.ConvertMsg.connect(self.Converter.ConvertMsgSlot) #Mainwindow -> Thread
         self.Converter.isFinish.connect(self.ConvertGetMsg) #Thread -> Mainwindow
         self.Converter.start()
-        self.ConvertMsg.emit(["LOAD", self.r_fileName[0]])
-        self.ConverterFinishCheck()
-        self.QProgressClose()
+        if(self.ConvertSendMsgProgressWait("Now Loading...", ["LOAD", self.r_JPfileName[0]]) == False):
+            self.ConvertMsg.emit(["FINISH"])
+            self.ConverterFinishCheck()
+            self.Converter.terminate()
+            self.r_JPfileName = None
+            self.MessageBox("Wrong JP-File Format!!")
+            return False
         self.pushButton_Cvt_KR.setEnabled(True)
         self.pushButton_Cvt_Txt.setEnabled(True)
         print("[MainWindow] Load JP Finish!!")
 
     
     def Convert_KR_Clicked(self):
-        self.w_data = Pokecard_Converter.KR_DATA("KR_Excel_Data.xlsx")
-        self.QProgressStart("Converting Now...")
-        self.ConvertMsg.emit(["CVT_KR"])
-        self.ConverterFinishCheck()
-        self.QProgressClose()
+        self.ConvertSendMsgProgressWait("Converting Now...", ["CVT_KR"])
         print("[MainWindow] Convert KR Finish!!")
-        self.MessageBox("Please check KR_Excel_Data.xlsx")
+        self.MessageBox("Please Check [ORG_NAME]_KOR.xlsx")
     
     def Convert_Txt_Clicked(self):
-        self.QProgressStart("Converting Now...")
-        self.ConvertMsg.emit(["CVT_TXT"])
-        self.ConverterFinishCheck()
-        self.QProgressClose()
+        self.ConvertSendMsgProgressWait("Converting Now...", ["CVT_TXT"])
         print("[MainWindow] Convert TXT Finish!!")
-        self.MessageBox("Please check Converted_Result.txt")
+        self.MessageBox("Convert Finish!!\nPlease Check Txt File")
+
+    def ConvertSendMsgProgressWait(self,txtSet, Msg):
+        self.QProgressStart(txtSet)
+        self.ConvertMsg.emit(Msg)
+        if(self.ConverterFinishCheck() == False):
+            self.QProgressClose()
+            return False
+        self.QProgressClose()
+        return True
     
     @pyqtSlot(list)
     def ConvertGetMsg(self, finishMsg):
         print("[MainWindow] GET Finish Msg", finishMsg)
         self.isFinish = finishMsg[0]
         if(len(finishMsg)>1):
-            self.r_data = finishMsg[1]  #After Load get read data
+            self.r_JPdata = finishMsg[1]  #After Load get read data
         
 
     def MessageBox(self,msg):

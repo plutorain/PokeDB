@@ -4,7 +4,7 @@ from pandas import read_excel
 from pandas import ExcelWriter
 from pandas import DataFrame
 from pandas import concat
-#import os
+import os
 import enum
 
 #QT GUI
@@ -99,14 +99,23 @@ class JP_DATA:
         self.xlsx = read_excel(f_name, encoding='utf-8', keep_default_na=False) #read dataframe
         self.key = self.xlsx.keys()
         self.START_ROW = 0
+        self.isLoadOK = False
+
+        EOF = len(self.xlsx.index)
+        print("JPDATA INDEX SIZE :", len(self.xlsx.index))
+
         while(1): #앞 세글자가 숫자일때까지 (1번 CARD위치찾기)
             cell = self.XLS_DATA(0 , self.START_ROW)
             if( (str(type(cell)) == "<class 'str'>") and cell[0:3] == "001" ):
                 print ("find Card No.1")
                 break
             self.START_ROW +=1
-            
+            if(self.START_ROW == EOF):
+                print("JPDATA return None!!!")
+                return None
+
         self.NOW_ROW = self.START_ROW
+        self.isLoadOK = True
         #print(self.xlsx.index.stop)
     
     def XLS_DATA( self , col , row ):
@@ -165,8 +174,8 @@ class JP_DATA:
         self.NOW_ROW += depth #다음 Card Data로 이동
         return tmp
         
-    def export_txt_files(self):
-        f = open("Converted_Result.txt", 'w', -1 ,"utf-8")
+    def export_txt_files(self, filename):
+        f = open(filename, 'w', -1 ,"utf-8")
         while( self.NOW_ROW < self.xlsx.index.stop ):
             print("NOW_CARD : %s" % self.XLS_DATA(JP_INDEX.CARD_NO.value,self.NOW_ROW))
             f.write(self.Get_Card_Data().__str__())
@@ -586,9 +595,6 @@ class KR_DATA:
             self.format[token]=[null_val]
         else:
             self.format[token]=[method(tmp)]
-
-        if(token == "WR_POKE_NO"):
-            print("Token:",token, type(token), "POKE_NO",tmp, type(tmp))
         
     
     def InputCardData(self, card):
@@ -762,7 +768,10 @@ class ConverterThread(QThread):
             if(self.MsgSlot == "LOAD"):
                 print("[ConverterThread] LOAD!!")
                 self.Load_JP()
-                self.isFinish.emit([True, self.r_data])
+                if(self.r_data.isLoadOK):
+                    self.isFinish.emit([True, self.r_data]) #Read Fail case self.r_data == None
+                else:
+                    self.isFinish.emit([True, None]) #Read Fail casee
                 self.MsgSlot = None
             elif(self.MsgSlot == "CVT_KR"):
                 print("[ConverterThread] CVT_KR")
@@ -787,11 +796,13 @@ class ConverterThread(QThread):
         print ("[ConverterThread] LOAD_JP")
         print(self.r_fileName)
         self.r_data = JP_DATA(self.r_fileName)
+
     
     def Convert_KR(self):
         print ("[ConverterThread] CONVERT_KR")
-        self.w_data = KR_DATA("KR_Excel_Data.xlsx")
-        self.file_name = "KR_Excel_Data.xlsx"
+        write_name = os.path.splitext(self.r_fileName)[0]+"_KOR.xlsx"
+        self.w_data = KR_DATA(write_name)
+        self.file_name = write_name
         df = DataFrame()
         while(True):
             card = self.r_data.Get_Card_Data()
@@ -804,8 +815,9 @@ class ConverterThread(QThread):
     
     def Convert_Txt(self):
         print ("[ConverterThread] CONVERT_TXT")
-        self.r_data.export_txt_files()
+        write_name = os.path.splitext(self.r_fileName)[0]+".txt"
         self.r_data.SetStartPos() #ready to convert again
+        self.r_data.export_txt_files(write_name)
 
     def closeEvent(self, event):
         print("[ConverterThread] closeEvent!!!")

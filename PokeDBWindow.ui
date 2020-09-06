@@ -120,11 +120,14 @@
      <widget class="QPushButton" name="pushButton_Load_JP">
       <property name="geometry">
        <rect>
-        <x>50</x>
-        <y>80</y>
-        <width>171</width>
+        <x>30</x>
+        <y>30</y>
+        <width>711</width>
         <height>71</height>
        </rect>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">background-color: rgba(255, 255, 0, 150)</string>
       </property>
       <property name="text">
        <string>LOAD JAPAN FILE</string>
@@ -133,11 +136,14 @@
      <widget class="QPushButton" name="pushButton_Cvt_KR">
       <property name="geometry">
        <rect>
-        <x>240</x>
-        <y>40</y>
-        <width>171</width>
+        <x>30</x>
+        <y>110</y>
+        <width>351</width>
         <height>71</height>
        </rect>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">background-color: rgba(0, 170, 0, 150)</string>
       </property>
       <property name="text">
        <string>CONVERT EXCEL KR</string>
@@ -146,11 +152,14 @@
      <widget class="QPushButton" name="pushButton_Cvt_Txt">
       <property name="geometry">
        <rect>
-        <x>240</x>
-        <y>120</y>
-        <width>171</width>
+        <x>390</x>
+        <y>110</y>
+        <width>351</width>
         <height>71</height>
        </rect>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">background-color: rgba(0, 170, 255, 150)</string>
       </property>
       <property name="text">
        <string>CONVERT TXT</string>
