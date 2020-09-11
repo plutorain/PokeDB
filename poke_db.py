@@ -46,6 +46,11 @@ except ImportError:
 #from html.parser import HTMLParser
 #from bs4 import BeautifulSoup
 
+import ctypes
+#For Icon
+myappid = 'mycompany.myproduct.subproduct.version' # arbitrary string
+ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+
 
 chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s'
 HIDE_BROWSER = True
@@ -256,8 +261,6 @@ class PokeDBWindow(QMainWindow, form_class):
     def __init__(self):
         super().__init__()
         self.setupUi(self)        
-        
-        #DataBase
         self.conn = None
         self.cursor = None
         self.DBtablelist = [] #DB Table List
@@ -796,6 +799,7 @@ class PokeDBWindow(QMainWindow, form_class):
             
         except mysql.connector.Error as err:
             print(err)
+            self.MessageBox(err)
 
     def DBUpdateFromExcel(self):
         print ("LOAD_JP")
@@ -1203,6 +1207,7 @@ class PokeDBWindow(QMainWindow, form_class):
         kor_name=kor_name.replace(" VMAX" ,"")
         kor_name=kor_name.replace(" EX","")
         kor_name=kor_name.replace(" GX","")
+        kor_name=kor_name.replace("가라르","ガラル")
         kor_name=kor_name.replace("M","")
         kor_name=kor_name.replace(" LV.X","")
         kor_name=kor_name.replace("[s]프리즘스타[/s]" ,"◇")
