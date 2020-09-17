@@ -35,7 +35,7 @@ import Pokecard_Converter
 #Reader 
 # from gtts import gTTS
 # from playsound import playsound
-# import os
+import os
 
 
 try:
@@ -54,6 +54,13 @@ ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
 chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s'
 HIDE_BROWSER = True
+
+if(os.path.isdir(chrome_path)):
+    pass
+else:
+    chrome_path = 'C:/Program Files/Google/Chrome/Application/chrome.exe %s'
+
+
 
 #DB 접속정보를 dict type 으로 준비한다.
 config={
@@ -417,20 +424,24 @@ class PokeDBWindow(QMainWindow, form_class):
 
         #Only Cardinfo table Use below Action
         if(self.DBTableNow == 'cardinfo'):
-            url_action = QAction("Open Current Row Card Page", self.tableWidget)
+            kr_url_action = QAction("Open Current Row Korea Card Page", self.tableWidget)
+            jp_url_action = QAction("Open Current Row Japan Card Page", self.tableWidget)
             kr_action = QAction("Show Current Row Korea Card", self.tableWidget)
             jp_action = QAction("Search Current Row Japan Card", self.tableWidget)
             findname_action = QAction("Search Current Row Japan Name", self.tableWidget)
             #read_action = QAction("Read Current Row", self.tableWidget)
             
-            self.tableWidget.addAction(url_action)
+            self.tableWidget.addAction(kr_url_action)
+            self.tableWidget.addAction(jp_url_action)
             self.tableWidget.addAction(kr_action)
             self.tableWidget.addAction(jp_action)
             self.tableWidget.addAction(findname_action)
             #self.tableWidget.addAction(read_action)
             
-            url_action.triggered.connect(self.QTableRowOpenUrl)
-            url_action.setShortcut('Ctrl+O')
+            kr_url_action.triggered.connect(self.QTableRowOpenUrl)
+            kr_url_action.setShortcut('Ctrl+O')
+            jp_url_action.triggered.connect(self.QTableRowOpenJPUrl)
+            jp_url_action.setShortcut('Ctrl+I')
             kr_action.triggered.connect(self.QTableShowCurrentRow)
             kr_action.setShortcut('Ctrl+K')
             jp_action.triggered.connect(self.QTableSearchJPCard2)
@@ -540,7 +551,8 @@ class PokeDBWindow(QMainWindow, form_class):
             currentRow = self.tableWidget.currentRow()
         else:
             currentRow =row
-        print("CurrentRow : %d , AddedList :"%(currentRow),self.tableAddList )
+        print("CurrentRow : ", currentRow)
+        #print("AddedList :: " ,self.tableAddList)
         try:
             self.tableAddList.index(currentRow)
             isAdd = True
@@ -1104,6 +1116,14 @@ class PokeDBWindow(QMainWindow, form_class):
                     self.CardWindow.show()
                     self.CardWindow.activateWindow()
 
+    def QTableRowOpenJPUrl(self):
+        row=self.tableWidget.currentRow()
+        if(self.tableWidget.item(row,53) != None ):
+            CardNum = self.tableWidget.item(row,53).text()
+            if(CardNum != "" and CardNum != "0" and CardNum != "Series" and CardNum != "empty"):
+                print("Find CardNum!!! : %s "%CardNum)
+                webbrowser.get(chrome_path).open('https://www.pokemon-card.com/card-search/details.php/card/'+CardNum+'/regu/alL')
+
 
     def QTableRowOpenUrl(self):
         row=self.tableWidget.currentRow()
@@ -1112,6 +1132,7 @@ class PokeDBWindow(QMainWindow, form_class):
             if(CardNum != ""):
                 print("Find CardNum!!! : %s "%CardNum)
                 webbrowser.get(chrome_path).open('https://pokemoncard.co.kr/cards/detail/'+CardNum)
+            
     
     def QTableSearchJPCard2(self):
         print("Search JP Card!!")
