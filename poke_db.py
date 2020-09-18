@@ -52,10 +52,11 @@ myappid = 'mycompany.myproduct.subproduct.version' # arbitrary string
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
 
-chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s'
+chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/'
 HIDE_BROWSER = True
 
 if(os.path.isdir(chrome_path)):
+    chrome_path += 'chrome.exe %s'
     pass
 else:
     chrome_path = 'C:/Program Files/Google/Chrome/Application/chrome.exe %s'
@@ -133,7 +134,8 @@ class EXCEL_DATA(QThread):
         return self.xlsx[self.key[col]][row]
 
     
-    def SetRedundantData(self, CompareData, fieldSeperator=False):
+    def SetRedundantData(self, col_cnt ,CompareData, fieldSeperator=False):
+        self.DB_ColCnt = col_cnt
         self.fieldSeperator = fieldSeperator
         self.CompareData = CompareData
     
@@ -142,9 +144,12 @@ class EXCEL_DATA(QThread):
         self.xlsx = read_excel(self.f_name, encoding='utf-8', keep_default_na=False) #read dataframe
         self.key = self.xlsx.keys()
 
-        print("[EXCEL QThread] DB Column size:",len(self.CompareData[0]), "Excel Column Size:", len(self.key))
+        #self.CompareData is Not Exist
+        #print(self.CompareData)
+        #print(self.key)
+        print("[EXCEL QThread] DB Column size:",self.DB_ColCnt, "Excel Column Size:", len(self.key))
 
-        if(len(self.CompareData[0]) != len(self.key)):
+        if(self.DB_ColCnt != len(self.key)):
             self.NonRedundantList.emit(["WRONG_FILE"])
         else:
             res=self.GetNonRedundantData(self.CompareData, self.fieldSeperator)
@@ -200,9 +205,9 @@ class EXCEL_DATA(QThread):
 
 
 class MyProgressBar(QProgressBar):
-    def __init__(self, widget):
+    def __init__(self, widget, min=0, max=0):
         super().__init__(widget)
-        self.setRange(0, 0)
+        self.setRange(min, max)
         self.setAlignment(Qt.AlignCenter)
         self._text = None
     def setText(self, text):
@@ -217,12 +222,13 @@ class QProgressPopup(QThread):
         QThread.__init__(self)
         self.w = QWidget()
         QProgressBar.__init__(self.w)
-        self.ProgressBar = MyProgressBar(self.w)
+        self.ProgressBar = MyProgressBar(self.w, min, max)
         self.cnt = 0
         self.ProgressBar.setRange(min,max)
         self.ProgressBar.resize(420,31)
         self.w.resize(420,31)
         self._status = False
+        
 
         if(hideTitle == True):
             self.w.setWindowFlag(Qt.FramelessWindowHint)
@@ -265,6 +271,9 @@ class PokeDBWindow(QMainWindow, form_class):
     #Converter Signal
     ConvertMsg=pyqtSignal(list)
 
+    #update progressvalue
+    progvalue=pyqtSignal(int)
+
     def __init__(self):
         super().__init__()
         self.setupUi(self)        
@@ -285,8 +294,6 @@ class PokeDBWindow(QMainWindow, form_class):
         self.actionSearch_Japan_Name.triggered.connect(self.QMenuSearchJPName)
         self.tableAddList = []
         self.tableUpdateList = []
-
-        
         self.max_cnt = 0
         #self.tableWidget.setItemDelegate(HTMLDelegate(self.tableWidget))
 
@@ -355,25 +362,24 @@ class PokeDBWindow(QMainWindow, form_class):
         #Text Reader
         self.tts = None
 
-        
-
     
-    def QProgressStart(self, getText):
+    def QProgressStart(self, getText, min=0, max=0):
         my_pos = {
             "x"     : self.pos().x(),
             "width" : self.width(), 
             "y"     : self.pos().y(),
             "height": self.height()
         }
-        self.ProgWindow = QProgressPopup(0,0, hideTitle=True, pos=my_pos, txt=getText)
+        if(min ==0 and max ==0):
+            self.ProgWindow = QProgressPopup(0,0, hideTitle=True, pos=my_pos, txt=getText)
+        else:
+            self.ProgWindow = QProgressPopup(min,max,  hideTitle=True, pos=my_pos)
         self.ProgCloseSig.connect(self.ProgWindow.closeEvent)
     
     def QProgressClose(self):
         self.ProgWindow.terminate()
         self.ProgCloseSig.emit(QEvent(QEvent.Close))
 
-        
-    
     def closeEvent(self, event):
         print("[MainWindow]closeEvent!!!")
         
@@ -480,7 +486,7 @@ class PokeDBWindow(QMainWindow, form_class):
         #Table Raw Label Right Button Menu
         row_header = self.tableWidget.verticalHeader()
         row_header.setContextMenuPolicy(Qt.ActionsContextMenu)
-        self.rowcopyAction  = QAction("Copy Selected Column", row_header)
+        self.rowcopyAction  = QAction("Copy Selected Row", row_header)
         self.rowUpdateDbAction = QAction("Update Selected Row to DataBase")
         row_header.addAction(self.colcopyAction)
         row_header.addAction(self.rowUpdateDbAction)
@@ -506,6 +512,7 @@ class PokeDBWindow(QMainWindow, form_class):
             #print("AddedList : ", self.tableAddList)
             #self.tableWidget.scrollToItem(self.tableWidget.item(rowcnt,0), QAbstractItemView.PositionAtCenter)
         print("Added Row Update to List Finish!!")
+        print(self.tableAddList)
 
     def QTableSelRowUpdateDB(self):
         print("QTableUpdateDataBase")
@@ -519,9 +526,19 @@ class PokeDBWindow(QMainWindow, form_class):
 
         print("Slected Rows",selectedRowList)
 
-        for row in selectedRowList:
-            self.QTableUpdateDataBase(row, disableMessage=True)
+
         
+        self.QProgressStart("!!", min=0, max=len(selectedRowList))
+
+        self.progvalue.connect(self.ProgWindow.ProgressBar.setValue)
+
+        for row in selectedRowList:
+            print("Row in Selected RowList:", row)
+            self.QTableUpdateDataBase(row, disableMessage=True)
+            self.progvalue.emit(row)
+            QtTest.QTest.qWait(1) #Wait 1ms
+        
+        self.QProgressClose()
         self.MessageBox("Upate Finish!!!\nSelected Rows")
 
   
@@ -547,7 +564,7 @@ class PokeDBWindow(QMainWindow, form_class):
         print("QTableUpdateDataBase")
         print("row : ", row)
         sql = 'INSERT INTO `pokecard`.`%s` ('%self.DBTableNow
-        if(row == False):
+        if(row == -1):
             currentRow = self.tableWidget.currentRow()
         else:
             currentRow =row
@@ -556,7 +573,7 @@ class PokeDBWindow(QMainWindow, form_class):
         try:
             self.tableAddList.index(currentRow)
             isAdd = True
-            print("Find Index From AddedRowList")
+            print("Find Index From AddedRowList", currentRow)
         except ValueError as e:
             UpdateInfo = None
             for table in self.tableUpdateList: #Searched Data was Changed
@@ -564,6 +581,7 @@ class PokeDBWindow(QMainWindow, form_class):
                     UpdateInfo = table            
             if(UpdateInfo == None):
                 self.MessageBox("Update ERROR!!!\nCan't Find Change")
+                print(self.tableAddList)
                 return False
             #UPDATE EX)UPDATE `pokecard`.`name` SET `KOR`='3',`JP`='4' WHERE  `JP`='1' AND `KOR`='2' LIMIT 1;
             sql_f = 'UPDATE `pokecard`.`%s` SET '%self.DBTableNow
@@ -593,7 +611,7 @@ class PokeDBWindow(QMainWindow, form_class):
                     sql+='"%s",'%self.tableWidget.item(currentRow, index).text()
                 log.append(self.tableWidget.item(currentRow, index).text())
         sql = sql[:-1] + ")"
-        print(sql)
+        #print(sql)
         #INSERT EX)INSERT INTO `pokecard`.`name` (`JP`, `KOR`) VALUES ('aaaa', 'bbb') LIMIT 1;
         self.textBrowser.append("NEW ROW :%s\n"%(log))
         self.DB_UpdateQuery(sql , disableMessage)
@@ -687,7 +705,7 @@ class PokeDBWindow(QMainWindow, form_class):
                         select_list2 = ["ability1", "ability2", "ability3", "ability4"]
                         menu.addAction("Check Only Ability", lambda:self.QMenuCheckSelected(int(WidgetItem.text(0)[6:])-1, select_list2))
                 menu.exec()
-                 
+                
             else:
                 menu.addAction("Check", lambda:self.QMenuCheckOne(WidgetItem, Qt.Checked))
                 menu.addAction("UnCheck", lambda:self.QMenuCheckOne(WidgetItem, Qt.Unchecked))
@@ -837,7 +855,7 @@ class PokeDBWindow(QMainWindow, form_class):
         if(self.DBTableNow == "cardinfo"):
             Seperator = True
         #res=self.r_data.GetNonRedundantData(DB_DATA, fieldSeperator=Seperator)
-        self.r_data.SetRedundantData(DB_DATA, fieldSeperator=Seperator)
+        self.r_data.SetRedundantData(self.col_cnt , DB_DATA, fieldSeperator=Seperator)
         self.r_data.NonRedundantList.connect(self.DBGetRedundantList)
         self.r_data.start()
         #CHECK MSG FROM THREAD
@@ -1057,7 +1075,8 @@ class PokeDBWindow(QMainWindow, form_class):
         RowCnt = range_t[0].rowCount()
         ColCnt = range_t[0].columnCount()
         
-        if(RowCnt < self.tableWidget.rowCount() and ColCnt < self.tableWidget.columnCount()): #select item
+        if(RowCnt < self.tableWidget.rowCount() and ColCnt < self.tableWidget.columnCount()): #select item Case
+            #print("Select Item")
             if(self.HideColumnAction in self.tableWidget.horizontalHeader().actions()):
                 self.tableWidget.horizontalHeader().removeAction(self.HideColumnAction)
                 self.tableWidget.horizontalHeader().removeAction(self.ShowColumnAction)
@@ -1066,15 +1085,15 @@ class PokeDBWindow(QMainWindow, form_class):
             #Chnage Ctrl+C Action (Column -> item)
             self.QTableCopyActionShortCutInit()
             self.copy_action.setShortcut('Ctrl+C')
-        elif(RowCnt == self.tableWidget.rowCount() and ColCnt == self.tableWidget.columnCount()): #select ALL
+        elif(RowCnt == self.tableWidget.rowCount() and ColCnt == self.tableWidget.columnCount()): #select ALL Case
+            #print("Select ALL")
             if(self.HideColumnAction in self.tableWidget.horizontalHeader().actions()):
                 self.tableWidget.horizontalHeader().removeAction(self.HideColumnAction)
                 self.tableWidget.horizontalHeader().removeAction(self.ShowColumnAction)
-            if(self.rowUpdateDbAction in self.tableWidget.verticalHeader().actions() ):
-                self.tableWidget.verticalHeader().removeAction(self.rowUpdateDbAction)
-            if(self.tableWidget.rowCount() == 1): #RowCount 1EA Case
+            if(not(self.rowUpdateDbAction in self.tableWidget.verticalHeader().actions())): #DB update Action ADD 
                 self.tableWidget.verticalHeader().addAction(self.rowUpdateDbAction)
             self.QTableCopyActionShortCutInit()
+            self.copy_action.setShortcut('Ctrl+C') #Cell Right Button
         elif(RowCnt == self.tableWidget.rowCount()): # column selected
             if(self.rowUpdateDbAction in self.tableWidget.verticalHeader().actions()):
                 self.tableWidget.verticalHeader().removeAction(self.rowUpdateDbAction)
