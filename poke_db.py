@@ -399,6 +399,8 @@ class PokeDBWindow(QMainWindow, form_class):
             self.jpCard.terminate()
             self.jpCardWindow.close()
         self.CardWindow.close()
+        self.jpCardWindow.close()
+        self.CardWindow.close()
         print("[MainWindow]Browser Close Finish!!!")
 
     
@@ -1159,6 +1161,26 @@ class PokeDBWindow(QMainWindow, form_class):
         row=self.tableWidget.currentRow()
         Series = self.tableWidget.item(row,45).text()
 
+        JPPageNo = self.tableWidget.item(row,53).text()
+        IsHaveJPNo = True
+        print("JPPageNo:", JPPageNo)
+        for i in JPPageNo:
+            if(ord(i) >= ord('0') and ord(i) <= ord('9')):
+                pass
+            else:
+                print("JP PAGE No ss not exist in DataBase!!")
+                IsHaveJPNo = False
+                break
+        if( JPPageNo == "0"):
+            IsHaveJPNo = False
+        if IsHaveJPNo:
+            link = "https://www.pokemon-card.com/assets/images/card_images/large/"+self.tableWidget.item(row,54).text()
+            print(link)
+            self.jpCardWindow.LoadImage(link)
+            self.jpCardWindow.show()
+            return True
+        print("333")
+
         sql = 'SELECT * FROM `pokecard`.`series` WHERE KRSeries LIKE "'+Series+'"'
         res=self.DB_SendQuery(sql)
         pageNo = 0
@@ -1201,7 +1223,7 @@ class PokeDBWindow(QMainWindow, form_class):
             print("Main : Send Signal List")
             self.request_url.emit([jpname, CardType, Series, pageNo])
         print("MAIN : FINISH REQUEST\n")
-         
+        
     @pyqtSlot(bool)
     def JPBrowserInitSignalSlot(self, isinit):
         print("Main : Get Init Signal ")

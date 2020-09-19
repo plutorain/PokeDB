@@ -869,11 +869,11 @@ class DataBase ():
         return col_list
 
     def GetALLTable(self):
-        sql = "SELECT * FROM `pokecard`.`%s` LIMIT 100000"%self.table
+        sql = "SELECT * FROM `pokecard`.`%s`"%self.table
         resultList=self.SendQuery(sql)
         return resultList
 
-    def SearcDB_UseColumnValue(self, col_name , search):
+    def SearchDB_UseColumnValue(self, col_name , search):
         sql = "SELECT * FROM `pokecard`.`%s` WHERE "%(self.table)
         if(isinstance(col_name, list)):
             col_len  = len(col_name)
@@ -945,7 +945,7 @@ if __name__ == "__main__":
         print("[MAIN] No.%d | Name: %s "%(index+1 ,ALL_Table[index][idx_CardName][1:-1]))
         DB.ChangeTable('name') #Change to Name Table
         OrgName = GetOriginalName(ALL_Table[index][idx_CardName][1:-1])
-        res = DB.SearcDB_UseColumnValue("KOR", OrgName ) #Get JP name
+        res = DB.SearchDB_UseColumnValue("KOR", OrgName ) #Get JP name
 
         if(len(res)>0):
             JPName = res[0][0]
@@ -957,7 +957,7 @@ if __name__ == "__main__":
             JPSeries = None
             KRSeries = None
             JPSeriesName = None
-            res=DB.SearcDB_UseColumnValue("KRSeries", inputSeries)
+            res=DB.SearchDB_UseColumnValue("KRSeries", inputSeries)
             if(len(res)>0):
                 JPSeries     = res[0][1].strip()
                 KRSeries     = res[0][2].strip()
@@ -983,7 +983,7 @@ if __name__ == "__main__":
                     col.append("GoodsName") 
                     txt.append(JPSeriesName[i])
                     
-                res=DB.SearcDB_UseColumnValue(col, txt)
+                res=DB.SearchDB_UseColumnValue(col, txt)
                 print("GET SUCCESS")
                 print(res)
 
@@ -1002,7 +1002,7 @@ if __name__ == "__main__":
     # for index in range(507 , 508):
     #     print("[MAIN] No.%d | Name: %s "%(index+1 ,ALL_Table[index][idx_CardName][1:-1]))
     #     DB.ChangeTable('name')
-    #     res = DB.SearcDB_UseColumnValue("KOR", GetOriginalName(ALL_Table[index][idx_CardName][1:-1]))
+    #     res = DB.SearchDB_UseColumnValue("KOR", GetOriginalName(ALL_Table[index][idx_CardName][1:-1]))
     #     if(len(res)>0):
     #         cardname = res[0][0]
     #         print("[MAIN] JP NAME: %s"%(cardname))
@@ -1010,7 +1010,7 @@ if __name__ == "__main__":
     #         inputSeries = ALL_Table[index][idx_Series][1:-1]
 
     #         DB.ChangeTable('series')
-    #         res=DB.SearcDB_UseColumnValue("KRSeries", inputSeries)
+    #         res=DB.SearchDB_UseColumnValue("KRSeries", inputSeries)
     #         pageNo = 0
     #         if(len(res)>0):
     #             print("[MAIN]] MAIN PAGE NO: %s, JPN_SERIES: %s, KOR_SERIES: %s "%(res[0][0],res[0][1],res[0][2]))
