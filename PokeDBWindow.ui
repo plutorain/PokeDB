@@ -203,14 +203,14 @@
    </widget>
    <widget class="QMenu" name="menuSearch">
     <property name="enabled">
-     <bool>false</bool>
+     <bool>true</bool>
     </property>
     <property name="title">
      <string>Search</string>
     </property>
     <widget class="QMenu" name="menuSearch_Select">
      <property name="enabled">
-      <bool>false</bool>
+      <bool>true</bool>
      </property>
      <property name="title">
       <string>Search Select</string>
@@ -219,6 +219,7 @@
     <addaction name="menuSearch_Select"/>
     <addaction name="actionSearch_Text"/>
     <addaction name="actionSearch_Japan_Name"/>
+    <addaction name="actionSearch_Korea_Name"/>
    </widget>
    <widget class="QMenu" name="menuTable">
     <property name="enabled">
@@ -300,6 +301,11 @@
    </property>
    <property name="text">
     <string>Load Table For Update</string>
+   </property>
+  </action>
+  <action name="actionSearch_Korea_Name">
+   <property name="text">
+    <string>Search Korea Name</string>
    </property>
   </action>
  </widget>

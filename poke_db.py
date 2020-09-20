@@ -292,6 +292,7 @@ class PokeDBWindow(QMainWindow, form_class):
         self.actionText_Marking.triggered.connect(self.QTableTextMarking)
         self.actionClear_Text_Marking.triggered.connect(self.QTableTextMarkingClear)
         self.actionSearch_Japan_Name.triggered.connect(self.QMenuSearchJPName)
+        self.actionSearch_Korea_Name.triggered.connect(self.QMenuSearchKRName)
         self.tableAddList = []
         self.tableUpdateList = []
         self.max_cnt = 0
@@ -1284,6 +1285,13 @@ class PokeDBWindow(QMainWindow, form_class):
             jpname=self.SearchJPNameFromDB(self.GetOriginalName(kor_name))
             self.MessageBox(jpname)
 
+    def QMenuSearchKRName(self):
+        print("QMenuSearchKRName")
+        jp_name, ok = QInputDialog.getText(self, 'InputWindow', 'Search Text')
+        if ok:
+            kr_name=self.SearchKRNameFromDB(jp_name)
+            self.MessageBox(kr_name)
+
     def SearchJPNameFromDB(self, kor_name):
         sql = "SELECT * FROM `pokecard`.`name` WHERE KOR LIKE \"" + kor_name +'"'
         res = self.DB_SendQuery(sql)
@@ -1291,6 +1299,18 @@ class PokeDBWindow(QMainWindow, form_class):
         if(len(res)>0):
             print("JP : %s, KOR: %s"%(res[0][0],res[0][1]))
             return res[0][0]
+        else:
+            return None
+    
+    def SearchKRNameFromDB(self, jp_name):
+        sql = "SELECT * FROM `pokecard`.`name` WHERE JP LIKE \"" + jp_name +'"'
+
+        print(sql)
+        res = self.DB_SendQuery(sql)
+        print(res)
+        if(len(res)>0):
+            print("JP : %s, KOR: %s"%(res[0][0],res[0][1]))
+            return res[0][1]
         else:
             return None
 
