@@ -61,6 +61,9 @@ if(os.path.isdir(chrome_path)):
 else:
     chrome_path = 'C:/Program Files/Google/Chrome/Application/chrome.exe %s'
 
+#HistoGram Draw
+import pymatplot 
+
 
 
 #DB 접속정보를 dict type 으로 준비한다.
@@ -255,7 +258,65 @@ class QProgressPopup(QThread):
         self.w.close()
         self.terminate()
 
-            
+
+class inputMultiDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        layout = QFormLayout()
+        self.btn = QPushButton("Select Search Column")
+        self.btn.clicked.connect(self.getItem)
+        self.items = ("AbilityLabel", "Ability", "DoxInfo")
+        self.le = QLineEdit()
+        layout.addRow(self.btn, self.le)
+        
+        self.btn1 = QPushButton("Search Text")
+        self.btn1.clicked.connect(self.gettext)
+        self.le1 = QLineEdit()
+        layout.addRow(self.btn1, self.le1)
+        
+        #self.btn2 = QPushButton("Enter an integer")
+        #self.btn2.clicked.connect(self.getint)
+        #self.le2 = QLineEdit()
+        #layout.addRow(self.btn2, self.le2)
+        
+        self.setLayout(layout)
+
+        buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        layout.addWidget(buttonBox)
+        buttonBox.accepted.connect(self.accept)
+        buttonBox.rejected.connect(self.reject)
+
+        self.setWindowTitle("Input Window")
+
+    def getItem(self):
+        
+        item, ok = QInputDialog.getItem(self, "select input dialog", "list of languages", self.items, 0, False)
+        if ok and item:
+            self.le.setText(item)
+
+    def gettext(self):
+        text, ok = QInputDialog.getText(self, 'Text Input Dialog', 'Enter your name:')
+        if ok:
+            self.le1.setText(str(text))
+
+    # def getint(self):
+    #     num, ok = QInputDialog.getInt(self, "integer input dualog", "enter a number")
+    #     if ok:
+    #         self.le2.setText(str(num))
+
+    def getinputs(self):
+        r1 = self.le.text()
+        try:
+            self.items.index(r1)
+        except:
+            r1 = ''
+        r2 = self.le1.text()
+        #r3 = self.le2.text()
+        if(r1 == '' or r2 == ''):
+            return False , [r1, r2]#,r3]
+        else:
+            return True , [r1, r2] #,r3]
 
         
 class PokeDBWindow(QMainWindow, form_class):
@@ -302,6 +363,7 @@ class PokeDBWindow(QMainWindow, form_class):
         self.menuSearchCount = 0
         self.actionConnect_To_DataBase.triggered.connect(self.Connect_Clicked)
         self.actionSearch_Text.triggered.connect(self.Search_Text_Clicked)
+        self.actionCount_Histogram.triggered.connect(self.DrawHistogramSearchCnt)
         self.menuList = []
         self.menuActionList = []
         
@@ -362,6 +424,64 @@ class PokeDBWindow(QMainWindow, form_class):
 
         #Text Reader
         self.tts = None
+
+
+    def DrawHistogramSearchCnt(self):
+        print("Draw Histo Gram!")
+        
+        getinput = inputMultiDialog()
+        getinput.setWindowIcon(QIcon("Pokemon.ico"))
+        getinput.show()
+        
+        inlist = None
+        ok = None
+        txt = None
+        findcol = []
+        if getinput.exec():
+            ok, inlist = getinput.getinputs()
+            print(inlist)
+            txt = inlist[1]
+            if(inlist[0] == 'AbilityLabel'):
+                findcol = [30,31,32,33]
+            elif(inlist[0] == 'Ability'):
+                findcol = [34,35,36,37]
+            elif(inlist[0] == 'DoxInfo'):
+                findcol = [11]
+
+        dicWordCount = {}
+        print("isOK:", ok ,"Inlist:",inlist, "findcol:",findcol, "SearchTxt:",txt)
+
+        if ok and txt!=None:
+            allitems = self.tableWidget.findItems("", Qt.MatchContains)
+            selected_items = self.tableWidget.findItems(txt, Qt.MatchContains)
+            for item in allitems:
+                if item in selected_items:
+                    try:
+                        findcol.index(item.column())
+                        ser = self.tableWidget.item(item.row(), 45).text()
+
+                        print(item.row()+1 , item.text())
+                        if(dicWordCount.get(ser)):
+                            dicWordCount[ser] +=1
+                        else:
+                            dicWordCount[ser] = 1
+                    except:
+                        pass
+                    
+
+            print(dicWordCount)
+            self.plot = pymatplot.QHistoGram(dicWordCount)
+
+            self.plot.setWindowTitle("PokeCard Histogram")
+            self.plot.setWindowIcon(QIcon("Pokemon.ico"))
+
+            self.plot.SetLabels('Series', 'Count')
+            self.plot.DrawGraph()
+            self.plot.show()
+            
+        else:
+            print("Input Fail!!")
+            return False
 
     
     def QProgressStart(self, getText, min=0, max=0):

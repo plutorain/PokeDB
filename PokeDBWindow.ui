@@ -220,10 +220,11 @@
     <addaction name="actionSearch_Text"/>
     <addaction name="actionSearch_Japan_Name"/>
     <addaction name="actionSearch_Korea_Name"/>
+    <addaction name="actionCount_Histogram"/>
    </widget>
    <widget class="QMenu" name="menuTable">
     <property name="enabled">
-     <bool>false</bool>
+     <bool>true</bool>
     </property>
     <property name="title">
      <string>Table</string>
@@ -306,6 +307,11 @@
   <action name="actionSearch_Korea_Name">
    <property name="text">
     <string>Search Korea Name</string>
+   </property>
+  </action>
+  <action name="actionCount_Histogram">
+   <property name="text">
+    <string>Count Histogram</string>
    </property>
   </action>
  </widget>
