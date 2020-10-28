@@ -28,9 +28,9 @@ class MyWindow(QMainWindow, form_class):
             QMessageBox.about(self, "Warning", "Please Input detail code!!!")
         
         else:
-            card_link = "https://pokemonkorea.co.kr/cards/detail/" + detail_code.strip()
+            card_link = "https://pokemoncard.co.kr/cards/detail/" + detail_code.strip()
             print (card_link)
-         
+            
             webpage = urllib.request.urlopen(card_link) 
             source  = BeautifulSoup(webpage,'html.parser')
             

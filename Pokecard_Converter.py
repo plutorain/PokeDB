@@ -106,8 +106,8 @@ class JP_DATA:
 
         while(1): #앞 세글자가 숫자일때까지 (1번 CARD위치찾기)
             cell = self.XLS_DATA(0 , self.START_ROW)
-            if( (str(type(cell)) == "<class 'str'>") and cell[0:3] == "001" ):
-                print ("find Card No.1")
+            if( (str(type(cell)) == "<class 'str'>") and cell[0:3].isnumeric() ):
+                print ("find Card No.", cell[0:3])
                 break
             self.START_ROW +=1
             if(self.START_ROW == EOF):

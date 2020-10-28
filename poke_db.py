@@ -5,7 +5,7 @@ import time
 #QT GUI
 import sys
 from PyQt5.QtWidgets import *
-from PyQt5 import uic 
+from PyQt5 import uic
 from PyQt5.QtGui import *
 from PyQt5.QtCore import Qt, QSize, QEvent, QThread, QObject
 form_class = uic.loadUiType("PokeDBWindow.ui")[0]
@@ -32,7 +32,7 @@ from PyQt5 import QtTest
 #PokeConverter
 import Pokecard_Converter
 
-#Reader 
+#Reader
 # from gtts import gTTS
 # from playsound import playsound
 import os
@@ -73,7 +73,7 @@ config={
         "host":"127.0.0.1",   
         "database":"pokecard",
         "port":3306
-    }
+}
 
 class WordCounter():
     def __init__(self, input_string):
@@ -96,12 +96,10 @@ class PokeScore():
     def __init__(self, input_string):
         print("PokeScoreinit")
         cards = input_string.split('\n')
-        
         self.data = []
         for card in cards:
             self.data.append(card.split(','))
         #print(self.data)
-        
         print("Finish Get ALL DATA")
         
     def CalcScore(self):

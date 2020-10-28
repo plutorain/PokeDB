@@ -1,6 +1,5 @@
 import sys
 from PyQt5.QtWidgets import *
-from PyQt5 import uic
 from PyQt5 import QtCore
 
 import numpy as np
@@ -8,15 +7,13 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 class QHistoGram(QDialog):
-    def __init__(self , data):
+    def __init__(self, data = None):
         super(QDialog, self).__init__()
-        
+        self.canvas = None
         self.IsDataSet = False
         self.value = None
         self.width = 0.35
-
         self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowSystemMenuHint | QtCore.Qt.WindowMinMaxButtonsHint)
-
         if(data == None or isinstance(data, list) or isinstance(data, dict)):
             if(data != None):
                 self.N = len(data)
@@ -33,8 +30,8 @@ class QHistoGram(QDialog):
                 self.IsDataSet = True
         else:
             raise TypeError
-        
-    
+
+
     def SetXtickLabels(self, x_labels):
         if(isinstance(x_labels, list) or isinstance(x_labels, tuple)):
             pass
