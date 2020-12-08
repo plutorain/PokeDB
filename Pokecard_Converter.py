@@ -594,6 +594,9 @@ class KR_DATA:
         if("n/a" in str(tmp)): 
             self.format[token]=[null_val]
         else:
+            if(method == int):
+                if(str(tmp).find('₋')>=0): #JP Minus '₋' replace to KR '-' for int() funtion
+                    tmp = str(tmp).replace('₋','-')
             self.format[token]=[method(tmp)]
         
     
@@ -722,7 +725,7 @@ class KR_DATA:
         
         self.Remove_null_Data("WR_RESISTANCE_LVL",int)
         
-        self.Remove_null_Data("WR_RETREAT",int)
+        self.Remove_null_Data("WR_RETREAT",int, null_val=0)
         
         #Make Data frame , Append to Excel File
         #df = pd.DataFrame( self.format )
