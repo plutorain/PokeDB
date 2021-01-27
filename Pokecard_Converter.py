@@ -680,8 +680,22 @@ class KR_DATA:
         
         index = self.format["WR_NAME"][0].find("[울트라비스트]")
         if( index >= 0 ):#울트라 비스트인경우
-            self.format["WR_NAME"] = self.format["WR_NAME"][0][0:index-1]
-        self.format["WR_NAME"] = self.Properties_Eng_to_Kor(self.format["WR_NAME"][0]) #0905 CardName 영문 한글변환 적용
+            self.format["WR_NAME"][0] = [ self.format["WR_NAME"][0][0:index-1] ]
+        
+        #210127 신규Label대응 [일격] , [다이맥스/일격], [거다이맥스/일격], [아이템/일격], [포켓몬의 도구/일격], [서포트/일격], [스타디움/일격], [특수 에너지/일격]
+        #210127 신규Label대응 [연격] , [다이맥스/연격], [거다이맥스/연격], [아이템/연격], [포켓몬의 도구/연격], [서포트/연격], [스타디움/연격], [특수 에너지/연격]
+        index=self.format["WR_NAME"][0].find("격]")         
+        if( index >= 0 ):#일격,연격 카드인경우
+            index = self.format["WR_NAME"][0].find("[")
+            if( self.format["WR_NAME"][0].find("연격]") > 0):
+                self.format["WR_NAME"][0] = self.format["WR_NAME"][0][0:index-1]+"[y]" 
+            else:
+                self.format["WR_NAME"][0] = self.format["WR_NAME"][0][0:index-1]+"[i]"
+        
+        self.format["WR_NAME"][0] = self.format["WR_NAME"][0].replace("[다이맥스]","") #210127 불필요 Label제거
+        self.format["WR_NAME"][0] = self.format["WR_NAME"][0].replace("[거다이맥스]","") #210127 불필요 Label제거
+
+        self.format["WR_NAME"][0] = self.Properties_Eng_to_Kor(self.format["WR_NAME"][0]) #0905 CardName 영문 한글변환 적용
             
         
         self.Remove_null_Data("WR_POKE_NO" , int , 0)
