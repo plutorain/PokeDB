@@ -688,9 +688,11 @@ class KR_DATA:
         if( index >= 0 ):#일격,연격 카드인경우
             index = self.format["WR_NAME"][0].find("[")
             if( self.format["WR_NAME"][0].find("연격]") > 0):
-                self.format["WR_NAME"][0] = self.format["WR_NAME"][0][0:index-1]+"[y]" 
+                self.format["WR_NAME"][0] = self.format["WR_NAME"][0][0:index-1]+"[yk]연격[/yk]"  #210221 CardType ,연격추가 및 yk변경
+                self.format["WR_CARDTYPE"] = self.format["WR_CARDTYPE"] + ",연격"
             else:
-                self.format["WR_NAME"][0] = self.format["WR_NAME"][0][0:index-1]+"[i]"
+                self.format["WR_NAME"][0] = self.format["WR_NAME"][0][0:index-1]+"[ik]일격[/ik]"  #210221 CardType ,일격추가 및 ik변경
+                self.format["WR_CARDTYPE"] = self.format["WR_CARDTYPE"] + ",일격"
         
         self.format["WR_NAME"][0] = self.format["WR_NAME"][0].replace("[다이맥스]","") #210127 불필요 Label제거
         self.format["WR_NAME"][0] = self.format["WR_NAME"][0].replace("[거다이맥스]","") #210127 불필요 Label제거
@@ -728,7 +730,7 @@ class KR_DATA:
 
         self.format["WR_ILLUSTRATOR"] = self.format["WR_ILLUSTRATOR"][0].replace("n/a","")        
         
-        self.Remove_null_Data("WR_HP", int)
+        self.Remove_null_Data("WR_HP", int, null_val=0) #200221 Null Value 0으로 변경
         
         self.format["WR_CARDMONTYPE"] = self.Properties_Eng_to_Kor(self.format["WR_CARDMONTYPE"][0]) #한글변경
         self.format["WR_WEAKNESS"][0] = self.Properties_Eng_to_Kor(self.format["WR_WEAKNESS"][0])
